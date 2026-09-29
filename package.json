@@ -8,7 +8,8 @@
   "scripts": {
     "dev:web": "pnpm --filter @washbase/web dev",
     "dev:mobile": "pnpm --filter @washbase/mobile start",
-    "api:client": "pnpm --filter @washbase/api-client sync",
+    "api:serve": "node scripts/api.mjs serve",
+    "api:client": "node scripts/api.mjs run -- pnpm --filter @washbase/api-client sync",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "test:e2e": "pnpm --filter @washbase/web test:e2e"

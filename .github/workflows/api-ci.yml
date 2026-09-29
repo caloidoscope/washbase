@@ -5,12 +5,14 @@ on:
     paths:
       - services/api/**
       - packages/api-client/**
+      - scripts/api.mjs
       - .github/workflows/api-ci.yml
   push:
     branches: [main]
     paths:
       - services/api/**
       - packages/api-client/**
+      - scripts/api.mjs
       - .github/workflows/api-ci.yml
 
 concurrency:
@@ -35,11 +37,6 @@ jobs:
           java-version: "21"
           cache: maven
       - run: ./mvnw -B verify
-      - uses: actions/upload-artifact@v7
-        with:
-          name: api-jar
-          path: services/api/target/api.jar
-          if-no-files-found: error
 
   contract:
     name: OpenAPI contract is in sync with api-client
@@ -64,21 +61,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+          cache: maven
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v8
-        with:
-          name: api-jar
-          path: jar
-      - name: Start API
-        run: |
-          java -jar jar/api.jar > api.log 2>&1 &
-          for i in $(seq 1 60); do curl -sf localhost:8080/actuator/health && exit 0; sleep 2; done
-          cat api.log; exit 1
+      # Builds the API, starts it, regenerates the client, stops it.
       - run: pnpm api:client
       - name: Fail if the committed client is stale
         run: |
