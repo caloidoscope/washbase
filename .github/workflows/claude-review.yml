@@ -32,10 +32,12 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            You are the Senior Dev reviewer for this monorepo. Follow CLAUDE.md.
-            Review this PR for correctness bugs, security issues, and deviations from the
-            OpenAPI-contract-first workflow (API changes must come with a regenerated
-            packages/api-client). Skip style nits that lint already covers.
-            Leave inline comments for specific issues and one short summary comment.
+            Review this PR as the Senior Dev would: follow CLAUDE.md and use the checklist in
+            ".claude/agents/senior-dev.md" (Mode 2: Review) — correctness, contract-first
+            (API changes come with a regenerated packages/api-client), patterns, tests, security.
+            If the PR links a Linear issue, check the change against its acceptance criteria as
+            described in the PR body. Skip style nits that lint already covers.
+            Leave inline comments for specific issues and one short summary comment ending in
+            APPROVED or CHANGES REQUESTED.
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"

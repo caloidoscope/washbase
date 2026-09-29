@@ -16,9 +16,9 @@ Prerequisites: JDK 21, Node 20+, pnpm, Docker.
 ```bash
 docker compose up -d                           # Postgres (host port 5433)
 pnpm install
-(cd services/api && ./mvnw spring-boot:run)    # API on :8080, docs at /swagger-ui.html
+pnpm api:serve                                 # API on :8080, docs at /swagger-ui.html
 pnpm dev:web                                   # web on :3000
 pnpm dev:mobile                                # Expo dev server
 ```
 
-See [CLAUDE.md](CLAUDE.md) for conventions, the contract-first workflow, and the git/PR process.
+See [CLAUDE.md](CLAUDE.md) for conventions, the contract-first workflow, the git/PR process, and how work is planned in Linear and built by the agents in `.claude/agents/`.

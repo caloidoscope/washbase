@@ -5,6 +5,8 @@ on:
     paths:
       - apps/**
       - packages/**
+      - services/api/**
+      - scripts/**
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
@@ -14,6 +16,8 @@ on:
     paths:
       - apps/**
       - packages/**
+      - services/api/**
+      - scripts/**
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
@@ -42,13 +46,32 @@ jobs:
       - run: pnpm typecheck
 
   e2e:
-    name: Playwright E2E (web)
+    name: Playwright E2E (web + API)
     runs-on: ubuntu-latest
+    # Playwright starts the API itself (scripts/api.mjs serve) against this database.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: washbase
+          POSTGRES_USER: washbase
+          POSTGRES_PASSWORD: washbase
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U washbase -d washbase"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: jdbc:postgresql://localhost:5432/washbase
     defaults:
       run:
         working-directory: apps/web
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
