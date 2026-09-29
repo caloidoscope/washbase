@@ -36,11 +36,10 @@ jobs:
           cache: maven
       - run: ./mvnw -B verify
       - uses: actions/upload-artifact@v7
-        if: always()
         with:
           name: api-jar
-          path: services/api/target/api-*.jar
-          if-no-files-found: ignore
+          path: services/api/target/api.jar
+          if-no-files-found: error
 
   contract:
     name: OpenAPI contract is in sync with api-client
@@ -77,7 +76,7 @@ jobs:
           path: jar
       - name: Start API
         run: |
-          java -jar jar/api-*.jar > api.log 2>&1 &
+          java -jar jar/api.jar > api.log 2>&1 &
           for i in $(seq 1 60); do curl -sf localhost:8080/actuator/health && exit 0; sleep 2; done
           cat api.log; exit 1
       - run: pnpm api:client
