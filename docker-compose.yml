@@ -1,0 +1,50 @@
+name: washbase
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: washbase
+      POSTGRES_USER: washbase
+      POSTGRES_PASSWORD: washbase
+    ports:
+      # 5432 is taken by another local project; host port 5433 avoids the clash.
+      - "5433:5432"
+    volumes:
+      - washbase-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U washbase -d washbase"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Long-lived SSE server for Claude Code's Postgres MCP. Replaces the stdio
+  # `docker run -i --rm` setup, which orphaned a container on every session restart.
+  postgres-mcp:
+    image: crystaldba/postgres-mcp
+    command: ["--access-mode=restricted", "--transport=sse"]
+    environment:
+      DATABASE_URI: ${WASHBASE_DATABASE_URI:-postgresql://washbase:washbase@postgres:5432/washbase}
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Opt-in: `docker compose --profile api up --build`. Day to day, run the API from the IDE / ./mvnw.
+  api:
+    build: ./services/api
+    profiles: [api]
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/washbase
+      DATABASE_USERNAME: washbase
+      DATABASE_PASSWORD: washbase
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  washbase-pgdata:

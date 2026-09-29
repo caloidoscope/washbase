@@ -1,0 +1,16 @@
+{
+  "name": "washbase",
+  "private": true,
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @washbase/web dev",
+    "dev:mobile": "pnpm --filter @washbase/mobile start",
+    "api:client": "pnpm --filter @washbase/api-client sync",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test:e2e": "pnpm --filter @washbase/web test:e2e"
+  }
+}

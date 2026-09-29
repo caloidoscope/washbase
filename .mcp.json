@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "type": "sse",
+      "url": "http://localhost:8000/sse"
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PAT}"
+      }
+    },
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    }
+  }
+}

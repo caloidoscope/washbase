@@ -1,0 +1,101 @@
+name: API CI
+
+on:
+  pull_request:
+    paths:
+      - services/api/**
+      - packages/api-client/**
+      - .github/workflows/api-ci.yml
+  push:
+    branches: [main]
+    paths:
+      - services/api/**
+      - packages/api-client/**
+      - .github/workflows/api-ci.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build & test (JUnit + Testcontainers)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: ./mvnw -B verify
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: api-jar
+          path: services/api/target/api-*.jar
+          if-no-files-found: ignore
+
+  contract:
+    name: OpenAPI contract is in sync with api-client
+    needs: test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: washbase
+          POSTGRES_USER: washbase
+          POSTGRES_PASSWORD: washbase
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U washbase -d washbase"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: jdbc:postgresql://localhost:5432/washbase
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: api-jar
+          path: jar
+      - name: Start API
+        run: |
+          java -jar jar/api-*.jar > api.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:8080/actuator/health && exit 0; sleep 2; done
+          cat api.log; exit 1
+      - run: pnpm api:client
+      - name: Fail if the committed client is stale
+        run: |
+          git diff --exit-code packages/api-client \
+            || { echo "::error::packages/api-client is out of date. Run 'pnpm api:client' against the API and commit the result."; exit 1; }
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: services/api
+          push: false
+          tags: washbase-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
