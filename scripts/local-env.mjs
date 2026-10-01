@@ -38,5 +38,6 @@ export function lanAddress() {
 export function printAccounts() {
   console.log("\nTest accounts (local only):");
   for (const a of LOCAL_ACCOUNTS) console.log(`  ${a.role.padEnd(7)} ${a.email.padEnd(20)} ${LOCAL_PASSWORD}`);
-  console.log("  (Owner/Staff/Client exist once the Features that add those roles are built.)\n");
+  console.log("  (Each account exists once the Feature that adds it is built: the Admin with the sign-in");
+  console.log("  foundation, CAR-17. The Admin may be asked to change the password at first sign-in.)\n");
 }

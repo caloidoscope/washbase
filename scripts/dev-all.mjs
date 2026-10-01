@@ -42,7 +42,7 @@ const { result } = concurrently(
     {
       name: "web",
       command: `pnpm --filter @washbase/web dev --hostname ${bindAddress}`,
-      env: { API_BASE_URL: "http://localhost:8080" },
+      env: { API_BASE_URL: "http://127.0.0.1:8080" },
       prefixColor: "blue",
     },
   ],
