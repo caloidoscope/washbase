@@ -28,7 +28,7 @@ All orders move through the following sequential operational statuses, driven pr
 - **Decoupled Workflow Rule**: Payment status (`Paid` / `Unpaid`) does **NOT** block or restrict order status progression. Orders can move through processing regardless of payment settlement.
 
 ### Branding & Customization
-- **Multi-Tenant / Custom Branding**: The system allows each laundry business to upload and configure its own custom logo, which dynamically renders across both the **Admin/Staff portal** and the **Customer-facing client interface**.
+- **Custom Branding**: The owner uploads and configures the business's own logo (a runtime setting of this deployment's single business; see Platform & Deployment Decisions), which dynamically renders across both the **Admin/Staff portal** and the **Customer-facing client interface**.
 
 ---
 
@@ -41,7 +41,7 @@ All orders move through the following sequential operational statuses, driven pr
 - **Employee / Staff Operations**: Order intake, manually updating status progression, logging payments
 - **Order Tracking**: Real-time client status visibility
 - **Owner Management**: Client/Staff user management, service pricing configuration, business profile
-- **Payment Options**: Non-cash payment integrations (GCash, QRPh/InstaPay, Card, Cash)
+- **Payment Options**: Integrated payments through a provider (GCash, QRPh/InstaPay, Card), plus recorded payments (Cash, direct GCash). See Platform & Deployment Decisions → Payments.
 
 ### Phase 2: Future / Post-MVP (Out of Scope for MVP)
 *Features marked for future enhancement. Claude should not generate MVP PBIs for these unless explicitly requested.*
