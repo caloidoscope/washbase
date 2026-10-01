@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@12.8.1",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "dev:all": "node scripts/dev-all.mjs",

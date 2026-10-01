@@ -1,6 +1,6 @@
 # washbase
 
-Monorepo for the Washbase API, web app, and mobile app.
+Laundry shop operations for one business per deployment: clients book drop-off, pickup or delivery and track their laundry; staff take in orders, move them through processing and record payments; owners manage accounts, pricing and branding. Product vision: [docs/products/vision.md](docs/products/vision.md).
 
 | Path | Stack |
 |---|---|
@@ -11,14 +11,71 @@ Monorepo for the Washbase API, web app, and mobile app.
 
 ## Getting started
 
-Prerequisites: JDK 21, Node 20+, pnpm, Docker.
+Prerequisites: JDK 21, Node 22+, pnpm, Docker Desktop (running).
 
 ```bash
-docker compose up -d                           # Postgres (host port 5433)
 pnpm install
-pnpm api:serve                                 # API on :8080, docs at /swagger-ui.html
-pnpm dev:web                                   # web on :3000
-pnpm dev:mobile                                # Expo dev server
+pnpm dev:all            # Postgres + API (http://localhost:8080) + web (http://localhost:3000)
 ```
 
-See [CLAUDE.md](CLAUDE.md) for conventions, the contract-first workflow, the git/PR process, and how work is planned in Linear and built by the agents in `.claude/agents/`.
+`pnpm dev:all` starts everything in one terminal and **Ctrl+C** stops it all. By default it listens on this PC only. API docs: http://localhost:8080/swagger-ui.html.
+
+### On a phone (Expo Go)
+
+```bash
+pnpm dev:all --lan      # terminal 1: also reachable from your Wi-Fi
+pnpm dev:mobile         # terminal 2: scan the QR code with Expo Go
+```
+
+The phone and PC must be on the same Wi-Fi. If the app can't reach the API, rerun `pnpm dev:mobile` with `LAN_IP=<your PC's Wi-Fi address>`; on Windows, also allow Java through the firewall for private networks. Use `--lan` only on a network you trust (see test accounts below).
+
+## Testing changes before they're merged
+
+Every Feature arrives as a pull request with a **"How to test this PR"** section (steps, which account to use, a checklist to tick).
+
+**One pull request:**
+
+```bash
+gh pr checkout <number>
+pnpm install
+pnpm dev:all
+git switch main         # when done
+```
+
+**All open pull requests at once:**
+
+```bash
+pnpm try:open-prs       # local branch preview/all-open-prs = main + every open PR combined
+pnpm install
+pnpm dev:all
+git switch main         # when done
+```
+
+`try:open-prs` rebuilds the combined branch fresh on every run and never pushes it. It skips (and lists) PRs that conflict with the others and PRs from forks, which you'd test on their own with `gh pr checkout` after reviewing their code.
+
+### Local test accounts
+
+Local only, password `Washbase-Local-1`:
+
+| Role | Sign in with |
+|---|---|
+| Admin | `admin@example.com` |
+| Owner | `owner@example.com` |
+| Staff | `staff@example.com` |
+| Client | `client@example.com` |
+
+Each account exists once the Feature that adds it is built (the Admin arrives with the sign-in foundation, CAR-17). The password is public, which is why `dev:all` listens on this PC only unless you pass `--lan`.
+
+## Other commands
+
+| Command | What it does |
+|---|---|
+| `pnpm lint` / `pnpm typecheck` | Lint and typecheck web, mobile and the API client |
+| `pnpm test:e2e` | Playwright end-to-end tests (starts the API and web app itself) |
+| `pnpm api:client` | Regenerate `packages/api-client` from the API's OpenAPI spec |
+| `pnpm api:serve` | Run only the API |
+| `(cd services/api && ./mvnw verify)` | API unit and integration tests (needs Docker) |
+
+## How work happens
+
+Ideas become Epics and Features in Linear, which the owner approves (`Backlog` → `Todo`) before AI agents build them as pull requests. The owner tests and merges each one. Details: [CLAUDE.md](CLAUDE.md) (workflow, conventions, git/PR process), [`.claude/agents/`](.claude/agents/) (the agent roles), and [docs/architecture/](docs/architecture/) (design decisions).
