@@ -9,10 +9,12 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import concurrently from "concurrently";
 import { localApiEnv, printAccounts } from "./local-env.mjs";
+import { instance } from "./instance.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const lan = process.argv.includes("--lan");
 const bindAddress = lan ? "0.0.0.0" : "127.0.0.1";
+const inst = instance();
 
 console.log("[dev:all] starting Postgres…");
 const db = spawnSync("docker", ["compose", "up", "-d", "--wait", "postgres"], { cwd: root, stdio: "inherit" });
@@ -20,9 +22,10 @@ if (db.status !== 0) {
   console.error("[dev:all] Postgres didn't start. Is Docker Desktop running?");
   process.exit(db.status ?? 1);
 }
+spawnSync("node", ["scripts/db.mjs", "ensure"], { cwd: root, stdio: "inherit" });
 
 printAccounts();
-console.log("Web: http://localhost:3000   API: http://localhost:8080 (Swagger UI: /swagger-ui.html)");
+console.log(`Web: ${inst.webUrl}   API: ${inst.apiUrl} (Swagger UI: /swagger-ui.html)`);
 if (lan) {
   console.log("LAN mode: the API and web app are reachable from your local network, and the test");
   console.log("accounts' password is public. Use this only on a network you trust.");
@@ -41,8 +44,8 @@ const { result } = concurrently(
     },
     {
       name: "web",
-      command: `pnpm --filter @washbase/web dev --hostname ${bindAddress}`,
-      env: { API_BASE_URL: "http://127.0.0.1:8080" },
+      command: `pnpm --filter @washbase/web dev --hostname ${bindAddress} --port ${inst.webPort}`,
+      env: { API_BASE_URL: `http://127.0.0.1:${inst.apiPort}` },
       prefixColor: "blue",
     },
   ],

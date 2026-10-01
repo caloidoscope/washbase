@@ -92,6 +92,17 @@ git switch main           # when done
 - Local test accounts (password `Washbase-Local-1`): `admin@example.com`, `owner@example.com`, `staff@example.com`, `client@example.com`, defined in `scripts/local-env.mjs`. The Admin comes from the bootstrap; the others come from a **local-only seed** (Spring profile `local`, which `dev:all` activates). When a Feature introduces a role or data needed to try it by hand, it adds that to the seed. The seed must never run outside the `local` profile.
 - Every Feature PR has a **"How to test this PR"** section: commands, which account to use for each scenario, and the manual checklist.
 - `pnpm try:open-prs` makes `preview/all-open-prs` (main + every open PR, merged locally). Never push it (a plain `git push` fails on it). PRs that conflict are skipped and listed.
+- `pnpm db:reset` empties this checkout's local database (e.g. after testing a PR whose migration later changed). The `local` profile tolerates migrations from other branches; a *changed* migration needs a reset.
+
+## Agent workspace
+
+The owner's folder is for the owner: they keep it on `main` and run `pnpm dev:all` there. **Delivery agents never work in it.** They work in a separate git worktree next to it, `../washbase-agents` (create with `git worktree add ../washbase-agents <branch>` if missing, then `pnpm install`), which has a git-ignored `.washbase-instance` file:
+
+```json
+{ "apiPort": 18080, "webPort": 13000, "database": "washbase_agents" }
+```
+
+`scripts/instance.mjs` reads it, so `pnpm api:client`, `pnpm test:e2e`, `pnpm dev:all` and Playwright in the worktree use ports 18080/13000 and their own database in the shared compose Postgres (created on demand). Both checkouts can run at the same time without clashing. Never stop processes on the owner's ports (8080, 3000, 8081): they belong to the owner. The read-only Postgres MCP points at the owner's `washbase` database, not `washbase_agents`.
 
 ## Git workflow
 

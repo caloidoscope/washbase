@@ -11,3 +11,6 @@ Thumbs.db
 
 # Claude Code personal settings
 .claude/settings.local.json
+
+# Per-checkout ports/database (scripts/instance.mjs)
+.washbase-instance
