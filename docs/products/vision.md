@@ -94,7 +94,7 @@ Epics represent broad, high-level functional modules. Break Epics down into modu
 ```
 
 ### Tier 2: Features
-Each Feature is one behavior, small enough to build, test and ship in one pull request. Acceptance criteria use **Given / When / Then** scenarios: each scenario becomes one automated test named after it, so the human can read the criteria and the tests prove them.
+Each Feature is one behavior, small enough to build, test and ship in one pull request. Acceptance criteria use **Given / When / Then** scenarios: each scenario becomes one automated test named after it (API and web), so the human can read the criteria and the tests prove them. Until a mobile end-to-end harness exists, mobile-only scenarios are checked manually on a device (Expo Go) and listed by name in the pull request.
 
 **Feature Format:**
 ```markdown
