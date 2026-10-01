@@ -38,19 +38,25 @@ run("git", ["config", `branch.${BRANCH}.pushRemote`, "do-not-push"]);
 const merged = [];
 const skipped = [];
 for (const pr of prs) {
-  if (tryRun("git", ["merge", "--no-edit", "--quiet", `origin/${pr.headRefName}`])) {
+  // Fetch by PR number so PRs from forks work as well as same-repo branches.
+  if (!tryRun("git", ["fetch", "--quiet", "origin", `pull/${pr.number}/head`])) {
+    skipped.push({ ...pr, reason: "could not fetch" });
+    continue;
+  }
+  if (tryRun("git", ["merge", "--no-edit", "--quiet", "FETCH_HEAD"])) {
     merged.push(pr);
   } else {
     tryRun("git", ["merge", "--abort"]);
-    skipped.push(pr);
+    skipped.push({ ...pr, reason: "conflicts with the PRs above" });
   }
 }
 
 console.log(`\nOn local branch ${BRANCH} = main + these open PRs:`);
 for (const pr of merged) console.log(`  #${pr.number}  ${pr.title}`);
 if (skipped.length) {
-  console.log("\nSkipped because they conflict with the PRs above (test them on their own with `gh pr checkout <n>`):");
-  for (const pr of skipped) console.log(`  #${pr.number}  ${pr.title}`);
+  console.log("\nSkipped (test them on their own with `gh pr checkout <n>`):");
+  for (const pr of skipped) console.log(`  #${pr.number}  ${pr.title}  (${pr.reason})`);
 }
-console.log("\nNext: pnpm install && pnpm dev:all   (mobile: pnpm dev:mobile in a second terminal)");
+console.log("\nNext: pnpm install && pnpm dev:all");
+console.log("To test on a phone: pnpm dev:all --lan, then pnpm dev:mobile in a second terminal");
 console.log("When done: git switch main\n");

@@ -83,7 +83,8 @@ Authentication and authorization follow **`docs/architecture/adr-001-authenticat
 ```bash
 gh pr checkout <n>        # one PR, or: pnpm try:open-prs  (all open PRs combined on a throwaway local branch)
 pnpm install
-pnpm dev:all              # Postgres + API (:8080) + web (:3000); Ctrl+C stops all
+pnpm dev:all              # Postgres + API (:8080) + web (:3000), on this PC only; Ctrl+C stops all
+pnpm dev:all --lan        # same, but reachable from your Wi-Fi: needed only for testing on a phone
 pnpm dev:mobile           # second terminal: Expo for Expo Go, API pointed at this PC's LAN address
 git switch main           # when done
 ```
