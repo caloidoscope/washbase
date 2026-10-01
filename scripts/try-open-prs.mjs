@@ -17,13 +17,17 @@ const tryRun = (cmd, args) => {
   }
 };
 
+if (!tryRun("git", ["config", "user.email"])) {
+  console.error("Git has no identity configured (needed to merge). Run: git config --global user.email <you@example.com>");
+  process.exit(1);
+}
 if (run("git", ["status", "--porcelain"])) {
   console.error("You have uncommitted changes. Commit or stash them first.");
   process.exit(1);
 }
 
 const prs = JSON.parse(
-  run("gh", ["pr", "list", "--state", "open", "--json", "number,title,headRefName", "--limit", "100"]),
+  run("gh", ["pr", "list", "--state", "open", "--json", "number,title,headRefName,isCrossRepository", "--limit", "100"]),
 ).sort((a, b) => a.number - b.number);
 if (prs.length === 0) {
   console.log("No open pull requests. Nothing to combine.");
@@ -38,6 +42,11 @@ run("git", ["config", `branch.${BRANCH}.pushRemote`, "do-not-push"]);
 const merged = [];
 const skipped = [];
 for (const pr of prs) {
+  // `pnpm install` runs install scripts, so never pull in unreviewed code from forks.
+  if (pr.isCrossRepository) {
+    skipped.push({ ...pr, reason: "from a fork: review its code, then test it with `gh pr checkout`" });
+    continue;
+  }
   // Fetch by PR number so PRs from forks work as well as same-repo branches.
   if (!tryRun("git", ["fetch", "--quiet", "origin", `pull/${pr.number}/head`])) {
     skipped.push({ ...pr, reason: "could not fetch" });
