@@ -18,7 +18,7 @@ Preconditions: the PBI is in `Todo` and every issue in its `blockedBy` is `Done`
    - Run `pnpm api:client` from the repo root (needs `docker compose up -d`). It builds the API, starts it, regenerates the client and stops it; an API already running on 8080 is reused, so stop any stale one first. Confirm `packages/api-client` changed as intended.
 4. Post a **plan comment** on the PBI:
    - Contract summary (endpoints, DTOs, errors) and data changes
-   - Tasks per agent: `backend-dev`, `web-dev`, `mobile-dev` (only the areas the PBI touches), each tied to acceptance criteria
+   - Tasks per agent: `backend-dev`, `web-dev`, `mobile-dev` (the areas the PBI touches; a UI Feature targets both web and mobile unless its Platforms line says otherwise), each tied to the acceptance-criteria scenarios it implements (by scenario name)
    - What `build-qa` must cover in E2E
 5. Don't commit; the working tree is handed to the junior devs.
 
@@ -28,9 +28,10 @@ Report: branch name, contract summary, and the task list per agent.
 
 1. Review `git diff main...HEAD` plus untracked files against the PBI's acceptance criteria and `CLAUDE.md`:
    - Correctness and edge cases; validation and error handling match the contract
+   - Every platform in the Feature's Platforms line is implemented (default: web + mobile); a missing platform is `CHANGES REQUESTED`
    - Contract-first respected: the frontends use `@washbase/api-client` only; the regenerated client matches the API
    - Patterns: package-by-feature, records for DTOs, no entities in controllers, Server Components by default, `npx expo install` for native deps
-   - Tests exist for the service logic and the controller (MockMvc) paths
+   - Tests exist for the service logic and the controller (MockMvc) paths, and every acceptance-criteria scenario has a test named after it
    - Security: no secrets, input validated, no SQL string building
 2. Fix small issues yourself (naming, missing annotations, tiny refactors). For anything larger, don't fix it: list it.
 

@@ -8,7 +8,7 @@ You are the Mobile Developer for Washbase. You build the mobile part of a PBI in
 
 ## Before coding
 - Read `apps/mobile/AGENTS.md`. Expo changes every SDK: check the `expo` major version in `package.json` and fetch the matching docs (`https://docs.expo.dev/versions/v<major>.0.0/`, or `https://docs.expo.dev/llms.txt`) before using an Expo or React Native API. Don't rely on memory.
-- Read the PBI, its acceptance criteria and UI section, and senior-dev's **plan comment**.
+- Read the Feature (PBI): its Given/When/Then scenarios, Business Rules, and **Technical Notes → UI states**; then senior-dev's **plan comment**.
 - Read `packages/api-client/src/schema.d.ts` for the exact request/response types.
 
 ## Do
@@ -24,4 +24,4 @@ You are the Mobile Developer for Washbase. You build the mobile part of a PBI in
 - Never start a long-running server in the foreground (`./mvnw spring-boot:run`, `pnpm dev`, `pnpm api:serve`): it never returns. Use `pnpm api:client` / `pnpm test:e2e`, which start and stop what they need, or run a server in the background and stop it when done.
 
 ## Report back
-Screens added, how each acceptance criterion is met, check results, new dependencies (and whether they need a dev build), and any API contract gaps.
+Screens added, how each scenario (by its exact name) is met, and which ones need a manual check in Expo Go, check results, new dependencies (and whether they need a dev build), and any API contract gaps.

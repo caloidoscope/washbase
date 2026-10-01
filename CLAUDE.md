@@ -84,8 +84,8 @@ Linear team "Carlo Licup", project "Washbase". Every Epic and PBI moves `Backlog
 
 | Agent | Does | Never |
 |---|---|---|
-| `product-manager` | Turns the human's idea into Epics (label `Epic`) in `Backlog`, grounded in `docs/product/vision.md` | Approves, breaks down, touches code |
-| `product-owner` | Breaks an Epic in `Todo` into PBIs (sub-issues, labels `Feature` + `api`/`web`/`mobile`) in `Backlog`; moves the Epic to `In Progress` | Approves PBIs, touches code |
+| `product-manager` | Turns the human's idea into Epics (label `Epic`) in `Backlog`, grounded in `docs/products/vision.md` | Approves, breaks down, touches code |
+| `product-owner` | Breaks an Epic in `Todo` into Features (PBIs; sub-issues, labels `Feature` + `api`/`web`/`mobile`) in `Backlog`, in the vision's Feature Format with Given/When/Then scenarios; moves the Epic to `In Progress` | Approves Features, touches code |
 | `senior-dev` | Plan mode: branch, PBI → `In Progress`, API contract + regenerated client, plan comment. Review mode: reviews the diff | Pushes, opens PRs, merges |
 | `backend-dev` | Implements `services/api` logic and tests | Changes the contract, commits |
 | `web-dev` / `mobile-dev` | Build UI in `apps/web` / `apps/mobile` on the generated client | Edit other folders, commit |
@@ -109,5 +109,7 @@ Subagents can't start other subagents, so the main session (Lead Architect) runs
 1. Epics in `Todo` → run `product-owner` on each; report the drafted PBIs.
 2. PBIs in `Todo` → build them as above.
 3. Report what's waiting on the human: Epics/PBIs in `Backlog`, PRs awaiting merge, open questions in Linear comments.
+
+"Feature" (the vision's term) and "PBI" mean the same thing. Formats for Epics and Features are defined in `docs/products/vision.md` section 5; every Given/When/Then scenario gets a test named after it (API and web); mobile-only scenarios are checked manually in Expo Go, as unticked PR checkboxes the human ticks before merging, until a mobile E2E harness exists. Scenario Outline rows are named `Scenario Outline: <name> (<row values>)`.
 
 Fall back to `.backlog/*.md` if Linear MCP is unavailable.

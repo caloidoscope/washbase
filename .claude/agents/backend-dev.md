@@ -12,7 +12,7 @@ The PBI ID. Read the PBI, its acceptance criteria, and senior-dev's **plan comme
 ## Do
 1. Implement the service and repository logic behind the stubbed controller methods. Keep the controller signatures and DTOs exactly as defined; they are the contract. If the contract is wrong or incomplete, stop and report it rather than changing it.
 2. Map entities ↔ DTOs explicitly; return the documented error statuses (e.g. `ResponseStatusException` or a `@RestControllerAdvice`).
-3. Tests:
+3. Tests (name each test after the acceptance-criteria scenario it proves, e.g. `@DisplayName("Scenario: Staff moves an order from Washing to Drying")`; implement a Scenario Outline as a `@ParameterizedTest` whose `name` is the outline's title plus JUnit's argument placeholders, e.g. `name = "Scenario Outline: Total price by service ({0} kg, {1} → {2})"` (JUnit only substitutes `{0}`, `{1}`, …; never leave `<…>` in a name), with one row per example, so each row's name is unique):
    - Unit tests (JUnit 5 + Mockito) for service logic, including validation and error branches
    - `@WebMvcTest` or MockMvc tests for each endpoint's success and error responses
    - `@DataJpaTest` with `TestcontainersConfiguration` for non-trivial queries
