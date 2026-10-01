@@ -22,7 +22,6 @@ if (db.status !== 0) {
   console.error("[dev:all] Postgres didn't start. Is Docker Desktop running?");
   process.exit(db.status ?? 1);
 }
-spawnSync("node", ["scripts/db.mjs", "ensure"], { cwd: root, stdio: "inherit" });
 
 printAccounts();
 console.log(`Web: ${inst.webUrl}   API: ${inst.apiUrl} (Swagger UI: /swagger-ui.html)`);
