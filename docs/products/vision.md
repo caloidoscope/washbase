@@ -12,7 +12,7 @@
 
 ## 2. Core User Personas
 - **Client**: Wants visibility into laundry progress, service convenience (pickup/delivery/drop-off), and flexible payment options under their chosen laundry shop's brand.
-- **Employee / Staff**: Wants a simple operational interface to intake laundry, process payments, and update order statuses smoothly as items move through processing.
+- **Employee / Staff** (called **Staff** in Epics, Features and tests): Wants a simple operational interface to intake laundry, process payments, and update order statuses smoothly as items move through processing.
 - **Owner / Admin**: Wants to manage client and employee accounts, configure pricing, customize business branding/logos, and oversee overall operations.
 
 ---
@@ -35,7 +35,7 @@ All orders move through the following sequential operational statuses, driven pr
 ## 4. Product Roadmap & Scoping
 
 ### Phase 1: MVP (Current Scope)
-*Focus strictly on core operational mechanics, staff order handling, client tracking, branding customization, basic management, and non-cash payment options.*
+*Focus strictly on core operational mechanics, staff order handling, client tracking, branding customization, basic management, and payment options (integrated and recorded).*
 - **Custom Branding**: Business owner logo customization for Admin/Staff and Customer interfaces
 - **Client Service Selection**: Drop-off, Pickup, Delivery requests
 - **Employee / Staff Operations**: Order intake, manually updating status progression, logging payments
@@ -84,7 +84,7 @@ Epics represent broad, high-level functional modules. Break Epics down into modu
 # Epic: [Epic Title / Functional Module]
 
 ## User Intent
-**As an** [Persona: Client / Employee / Owner]  
+**As a** [Persona: Client / Staff / Owner]  
 **I want to** [high-level goal or action]  
 **So that** [business or user outcome]  
 
