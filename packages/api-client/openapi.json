@@ -4,6 +4,107 @@
     "title": "Washbase API",
     "version": "v1"
   },
-  "paths": {},
-  "components": {}
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Me",
+      "description": "The signed-in user"
+    }
+  ],
+  "paths": {
+    "/api/v1/me": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Who am I",
+        "description": "Returns the signed-in user, identified by the access token's `sub`. Roles: CLIENT, STAFF, OWNER, ADMIN.",
+        "operationId": "getMe",
+        "responses": {
+          "200": {
+            "description": "The signed-in user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token (missing, expired, wrong issuer/audience/signature), or the token's user no longer exists or has been deactivated."
+          },
+          "403": {
+            "description": "The token carries none of the allowed roles."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "MeResponse": {
+        "type": "object",
+        "description": "The signed-in user.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "User ID (the access token's `sub`)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name.",
+            "example": "Admin"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "description": "Email address (lower-case), or null if the user signs in with a mobile number only.",
+            "example": "admin@example.com"
+          },
+          "mobile": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Philippine mobile number in +639XXXXXXXXX form, or null if none.",
+            "example": "+639171234567"
+          },
+          "role": {
+            "type": "string",
+            "description": "The user's role. Each user has exactly one.",
+            "enum": [
+              "CLIENT",
+              "STAFF",
+              "OWNER",
+              "ADMIN"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "id",
+          "mobile",
+          "name",
+          "role"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "description": "Access token (JWT) from the Washbase authorization server.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
 }
