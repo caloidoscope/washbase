@@ -17,8 +17,17 @@ const apiEnv = {
   ...process.env,
   SERVER_PORT: process.env.SERVER_PORT ?? String(inst.apiPort),
   DATABASE_URL: process.env.DATABASE_URL ?? inst.databaseUrl,
+  // Read by the auth work (ADR-001): tokens must be issued for this checkout's own URL.
   WASHBASE_AUTH_ISSUER: process.env.WASHBASE_AUTH_ISSUER ?? apiUrl,
 };
+
+/** Create this checkout's database if needed: only for the compose Postgres, i.e. when no
+ *  explicit DATABASE_URL is given (CI provides its own database). */
+function ensureDatabase() {
+  if (process.env.DATABASE_URL || inst.database === "washbase") return;
+  const res = spawnSync("node", [path.join(root, "scripts", "db.mjs"), "ensure"], { cwd: root, stdio: "inherit" });
+  if (res.status !== 0) process.exit(res.status ?? 1);
+}
 const healthUrl = `${apiUrl}/actuator/health`;
 
 const [mode, ...rest] = process.argv.slice(2);
@@ -64,6 +73,7 @@ async function waitUntilHealthy(child, timeoutMs = 120_000) {
 }
 
 if (mode === "serve") {
+  ensureDatabase();
   build();
   const child = start("inherit");
   for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill());
@@ -73,6 +83,7 @@ if (mode === "serve") {
   if (await isHealthy()) {
     console.log(`[api] reusing the API already running at ${apiUrl} — make sure it is up to date`);
   } else {
+    ensureDatabase();
     build();
     child = start(["ignore", "inherit", "inherit"]);
     try {

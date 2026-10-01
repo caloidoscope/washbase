@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-// Ports come from this checkout's `.washbase-instance` file (see scripts/instance.mjs), so the
-// owner's folder and the agents' worktree can run E2E at the same time.
+// Ports come from this checkout's `.washbase-instance` file, so the owner's folder and the agents'
+// worktree can run E2E at the same time. Keep the defaults in sync with scripts/instance.mjs.
 const instanceFile = path.resolve(__dirname, "../../.washbase-instance");
 const instance = fs.existsSync(instanceFile) ? JSON.parse(fs.readFileSync(instanceFile, "utf8")) : {};
 const PORT = instance.webPort ?? 3000;
