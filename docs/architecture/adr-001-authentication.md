@@ -8,8 +8,8 @@
 The owner wants every API to use OAuth/JWT authorization. Constraints from `docs/products/vision.md`:
 
 - **One laundry business per deployment.** Each new client gets its own forked deployment, so the auth setup is repeated per client and must stay cheap and self-contained.
-- **Three roles:** Client, Staff and Owner. Every role uses both the web app (Next.js) and the mobile app (Expo).
-- **Sign-in with email or mobile number.** Clients can register themselves, Staff and Owners create accounts, and multiple Owners are allowed. Walk-in clients are records, not users, and never sign in.
+- **Four roles:** Client, Staff, Owner, and Admin. Admin is the deployment's operator, who manages Owner accounts; Owners manage Staff and Clients but not other Owners. Every shop role (Client, Staff, Owner) uses both the web app (Next.js) and the mobile app (Expo); which apps the Admin uses is an open question on CAR-5.
+- **Sign-in with email or mobile number.** Clients can register themselves. Staff and Owners create Client accounts, Owners create Staff accounts, and only the Admin creates Owner accounts (there can be several Owners). Walk-in clients are records, not users, and never sign in. New email addresses and mobile numbers are confirmed with a one-time code (email or SMS).
 - **The business's logo**, which the Owner uploads at runtime, must appear on every screen, including sign-in.
 
 ## Decision
@@ -34,7 +34,7 @@ Embedded means one deployable per client deployment. The issuer URL is configura
 - **Login, registration, forgot-password and verification pages** are served by the authorization server and show the business's logo and name.
 
 ### Tokens
-- **Access token:** a JWT signed with an asymmetric key (RS256), valid for **15 minutes**. Claims: `iss`, `sub` (user ID), `aud`, `exp`, `iat`, `roles` (`CLIENT` / `STAFF` / `OWNER`), and `scope`.
+- **Access token:** a JWT signed with an asymmetric key (RS256), valid for **15 minutes**. Claims: `iss`, `sub` (user ID), `aud`, `exp`, `iat`, `roles` (`CLIENT` / `STAFF` / `OWNER` / `ADMIN`), and `scope`.
 - **Refresh token:** opaque, **rotated on every use**, revoked on sign-out, password change and deactivation. Lifetime 30 days (configurable).
 - **Signing keys:** supplied by environment or secret, never in the repo, and published via the JWKS endpoint so they can be rotated. Local development generates a key at startup.
 - **Deactivation:** refresh tokens are revoked immediately, and access tokens expire within 15 minutes. If immediate lock-out is ever required, add a per-request "user active" check.
@@ -42,9 +42,17 @@ Embedded means one deployable per client deployment. The issuer URL is configura
 ### Protecting the API
 - **Default deny:** every `/api/**` endpoint requires a valid JWT. Signature, `iss`, `aud` and `exp` are all checked.
 - **Public endpoints are an explicit allowlist** in one place: `/actuator/health`, the OAuth/OIDC endpoints, the login, registration and password-reset pages, and `/v3/api-docs` and Swagger UI. The docs endpoints are controlled by one property, `washbase.security.public-api-docs`, which defaults to **`true`** and is set to `false` only in production configuration. Local runs, `pnpm api:client` (`scripts/api.mjs`) and the CI `contract` job fetch `/v3/api-docs` without a token and must keep working. A Feature that needs another public endpoint must say so in its Technical Notes.
-- **Role checks:** a `roles` claim maps to authorities, checked with `@PreAuthorize("hasRole('STAFF')")` (or similar) on the controller method.
+- **Role checks:** a `roles` claim maps to authorities, checked with `@PreAuthorize` on the controller method. **Roles are independent, not a hierarchy:** each user has exactly one role (the token's `roles` claim is an array for standards compatibility but always holds one value; don't build multi-role handling), and `OWNER` does not imply `STAFF` (nor `ADMIN` imply `OWNER`). An endpoint lists every role it allows, e.g. `@PreAuthorize("hasAnyRole('STAFF','OWNER')")`, so each Feature states exactly who may call it and the `403` tests cover every other role.
 - **Ownership checks**, such as a Client seeing only their own orders, happen in the service layer using `sub`, never a user ID taken from the request.
+- **Admin bootstrap:** on start-up, if no *active* `ADMIN` exists, one is created from `WASHBASE_ADMIN_EMAIL` (or `WASHBASE_ADMIN_MOBILE`) and `WASHBASE_ADMIN_INITIAL_PASSWORD`, supplied as deployment secrets, never in the repo. The initial password is never logged, and the first sign-in forces a password change. If no active Admin exists and the variables are missing, the app logs a warning (without secrets) and starts anyway. No Owner or Admin can be created by self-registration.
+- **Last-Admin protection:** the last active Admin can't be deactivated, including by themselves. If access is lost anyway (e.g. forgotten password and no reset channel yet), the operator deactivates the Admin(s) in the database and restarts with the bootstrap variables set. If an inactive Admin with the same email or mobile already exists, bootstrap **reactivates that account and resets its password** to the initial one (first sign-in again forces a change) instead of creating a duplicate. The same rule applies to Owners: deactivating the last active Owner is refused, pending the answer on CAR-5.
 - **Passwords** are hashed with Spring Security's `DelegatingPasswordEncoder` (bcrypt or argon2), and attempts are rate-limited on the login and reset endpoints.
+- **One-time codes** (contact confirmation, password reset, first password for counter-created clients):
+  - 6 digits, stored only as a hash, single use, expire after **10 minutes**.
+  - At most **5 wrong attempts** per code; after that the code is void and a new one must be requested.
+  - Resends are limited to 1 per minute and 5 per hour per contact.
+  - Responses never reveal whether an email or number has an account.
+- **Sending email and SMS:** through one internal interface (`NotificationSender`, with email and SMS implementations), each provider chosen and configured per deployment. Codes and messages are never logged. Choosing the providers is open (CAR-13). Until then, Features that send codes are blocked, and local development and tests use a fake sender that records messages.
 
 ### Contract and clients
 - **OpenAPI:** declares a global `bearerAuth` (JWT) security scheme, and public endpoints opt out. The committed `packages/api-client/openapi.json` is generated with these security settings applied, so the contract shows which endpoints need a token. The required role for each endpoint is written in its `@Operation` description.
