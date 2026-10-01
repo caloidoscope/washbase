@@ -1,5 +1,6 @@
 // Combine every open pull request into one throwaway local branch to manually test all
-// in-progress Features together. The branch is local only and can't be pushed.
+// in-progress Features together. The branch is local only and must never be pushed
+// (a plain `git push` fails on it; don't push it explicitly either).
 //
 //   pnpm try:open-prs        then: pnpm install && pnpm dev:all (and pnpm dev:mobile)
 //   git switch main          when done (the preview branch is rebuilt on every run)
@@ -31,7 +32,7 @@ if (prs.length === 0) {
 
 run("git", ["fetch", "--quiet", "origin"]);
 run("git", ["switch", "--quiet", "-C", BRANCH, "origin/main"]);
-// Safety: make `git push` fail on this branch.
+// Safety net: a plain `git push` on this branch fails (an explicit `git push origin <branch>` would not).
 run("git", ["config", `branch.${BRANCH}.pushRemote`, "do-not-push"]);
 
 const merged = [];

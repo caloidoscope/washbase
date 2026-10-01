@@ -18,13 +18,21 @@ export const localApiEnv = {
   WASHBASE_ADMIN_INITIAL_PASSWORD: LOCAL_PASSWORD,
 };
 
-/** This PC's address on the local network, so a phone running Expo Go can reach the API. */
+/** This PC's address on the local network, so a phone running Expo Go can reach the API.
+ *  Set LAN_IP to override. 192.168.x and 10.x are preferred over 172.16–31.x, which is also
+ *  used by Docker, WSL and Hyper-V virtual adapters. */
 export function lanAddress() {
-  const candidates = Object.values(os.networkInterfaces())
+  if (process.env.LAN_IP) return process.env.LAN_IP;
+  const addresses = Object.values(os.networkInterfaces())
     .flat()
-    .filter((i) => i && i.family === "IPv4" && !i.internal);
-  const isPrivate = (a) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a);
-  return (candidates.find((i) => isPrivate(i.address)) ?? candidates[0])?.address ?? "localhost";
+    .filter((i) => i && i.family === "IPv4" && !i.internal)
+    .map((i) => i.address);
+  const ranked = [/^192\.168\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./];
+  for (const pattern of ranked) {
+    const match = addresses.find((a) => pattern.test(a));
+    if (match) return match;
+  }
+  return addresses[0] ?? "localhost";
 }
 
 export function printAccounts() {

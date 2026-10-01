@@ -90,7 +90,7 @@ git switch main           # when done
 
 - Local test accounts (password `Washbase-Local-1`): `admin@example.com`, `owner@example.com`, `staff@example.com`, `client@example.com`, defined in `scripts/local-env.mjs`. The Admin comes from the bootstrap; the others come from a **local-only seed** (Spring profile `local`, which `dev:all` activates). When a Feature introduces a role or data needed to try it by hand, it adds that to the seed. The seed must never run outside the `local` profile.
 - Every Feature PR has a **"How to test this PR"** section: commands, which account to use for each scenario, and the manual checklist.
-- `pnpm try:open-prs` makes `preview/all-open-prs` (main + every open PR, merged locally). Push is disabled on it. PRs that conflict are skipped and listed.
+- `pnpm try:open-prs` makes `preview/all-open-prs` (main + every open PR, merged locally). Never push it (a plain `git push` fails on it). PRs that conflict are skipped and listed.
 
 ## Git workflow
 
