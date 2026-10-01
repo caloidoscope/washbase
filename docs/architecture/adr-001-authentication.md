@@ -8,8 +8,8 @@
 The owner wants every API to use OAuth/JWT authorization. Constraints from `docs/products/vision.md`:
 
 - **One laundry business per deployment.** Each new client gets its own forked deployment, so the auth setup is repeated per client and must stay cheap and self-contained.
-- **Four roles:** Client, Staff, Owner, and Admin. Admin is the deployment's operator, who manages Owner accounts; Owners manage Staff and Clients but not other Owners. Every shop role uses both the web app (Next.js) and the mobile app (Expo).
-- **Sign-in with email or mobile number.** Clients can register themselves, Staff and Owners create accounts, and multiple Owners are allowed. Walk-in clients are records, not users, and never sign in. New email addresses and mobile numbers are confirmed with a one-time code (email or SMS).
+- **Four roles:** Client, Staff, Owner, and Admin. Admin is the deployment's operator, who manages Owner accounts; Owners manage Staff and Clients but not other Owners. Every shop role (Client, Staff, Owner) uses both the web app (Next.js) and the mobile app (Expo); which apps the Admin uses is an open question on CAR-5.
+- **Sign-in with email or mobile number.** Clients can register themselves. Staff and Owners create Client accounts, Owners create Staff accounts, and only the Admin creates Owner accounts (there can be several Owners). Walk-in clients are records, not users, and never sign in. New email addresses and mobile numbers are confirmed with a one-time code (email or SMS).
 - **The business's logo**, which the Owner uploads at runtime, must appear on every screen, including sign-in.
 
 ## Decision
@@ -42,10 +42,17 @@ Embedded means one deployable per client deployment. The issuer URL is configura
 ### Protecting the API
 - **Default deny:** every `/api/**` endpoint requires a valid JWT. Signature, `iss`, `aud` and `exp` are all checked.
 - **Public endpoints are an explicit allowlist** in one place: `/actuator/health`, the OAuth/OIDC endpoints, the login, registration and password-reset pages, and `/v3/api-docs` and Swagger UI. The docs endpoints are controlled by one property, `washbase.security.public-api-docs`, which defaults to **`true`** and is set to `false` only in production configuration. Local runs, `pnpm api:client` (`scripts/api.mjs`) and the CI `contract` job fetch `/v3/api-docs` without a token and must keep working. A Feature that needs another public endpoint must say so in its Technical Notes.
-- **Role checks:** a `roles` claim maps to authorities, checked with `@PreAuthorize("hasRole('STAFF')")` (or similar) on the controller method.
+- **Role checks:** a `roles` claim maps to authorities, checked with `@PreAuthorize` on the controller method. **Roles are independent, not a hierarchy:** each user has exactly one role, and `OWNER` does not imply `STAFF` (nor `ADMIN` imply `OWNER`). An endpoint lists every role it allows, e.g. `@PreAuthorize("hasAnyRole('STAFF','OWNER')")`, so each Feature states exactly who may call it and the `403` tests cover every other role.
 - **Ownership checks**, such as a Client seeing only their own orders, happen in the service layer using `sub`, never a user ID taken from the request.
-- **Bootstrap:** the first `ADMIN` account is created on a deployment's first start from deployment configuration (environment or secrets, never the repo), and only if no Admin exists yet. No Owner or Admin can be created by self-registration.
+- **Admin bootstrap:** on start-up, if no *active* `ADMIN` exists, one is created from `WASHBASE_ADMIN_EMAIL` (or `WASHBASE_ADMIN_MOBILE`) and `WASHBASE_ADMIN_INITIAL_PASSWORD`, supplied as deployment secrets, never in the repo. The initial password is never logged, and the first sign-in forces a password change. If no Admin exists and the variables are missing, the app logs a warning (without secrets) and starts anyway. No Owner or Admin can be created by self-registration.
+- **Last-Admin protection:** the last active Admin can't be deactivated, including by themselves. If access is lost anyway, the operator restores it by deactivating Admins in the database and restarting with the bootstrap variables set. The same rule applies to Owners: deactivating the last active Owner is refused, pending the answer on CAR-5.
 - **Passwords** are hashed with Spring Security's `DelegatingPasswordEncoder` (bcrypt or argon2), and attempts are rate-limited on the login and reset endpoints.
+- **One-time codes** (contact confirmation, password reset, first password for counter-created clients):
+  - 6 digits, stored only as a hash, single use, expire after **10 minutes**.
+  - At most **5 wrong attempts** per code; after that the code is void and a new one must be requested.
+  - Resends are limited to 1 per minute and 5 per hour per contact.
+  - Responses never reveal whether an email or number has an account.
+- **Sending email and SMS:** through one internal interface (`NotificationSender`, with email and SMS implementations), each provider chosen and configured per deployment. Codes and messages are never logged. Choosing the providers is open (CAR-13). Until then, Features that send codes are blocked, and local development and tests use a fake sender that records messages.
 
 ### Contract and clients
 - **OpenAPI:** declares a global `bearerAuth` (JWT) security scheme, and public endpoints opt out. The committed `packages/api-client/openapi.json` is generated with these security settings applied, so the contract shows which endpoints need a token. The required role for each endpoint is written in its `@Operation` description.
