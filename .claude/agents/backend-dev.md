@@ -14,7 +14,7 @@ The PBI ID. Read the PBI, its acceptance criteria, and senior-dev's **plan comme
 2. Map entities ↔ DTOs explicitly; return the documented error statuses (e.g. `ResponseStatusException` or a `@RestControllerAdvice`).
 3. Tests (name each test after the acceptance-criteria scenario it proves, e.g. `@DisplayName("Scenario: Staff moves an order from Washing to Drying")`; implement a Scenario Outline as a `@ParameterizedTest` whose `name` is the outline's title plus JUnit's argument placeholders, e.g. `name = "Scenario Outline: Total price by service ({0} kg, {1} → {2})"` (JUnit only substitutes `{0}`, `{1}`, …; never leave `<…>` in a name), with one row per example, so each row's name is unique):
    - Unit tests (JUnit 5 + Mockito) for service logic, including validation and error branches
-   - `@WebMvcTest` or MockMvc tests for each endpoint's success and error responses
+   - `@WebMvcTest` or MockMvc tests for each endpoint's success and error responses, including `401` without a token and `403` for a wrong role (use Spring Security's `jwt()` post-processor); "own data only" rules use the token's `sub`
    - `@DataJpaTest` with `TestcontainersConfiguration` for non-trivial queries
 4. Use the Postgres MCP (read-only) to inspect the live schema or `EXPLAIN` queries when useful.
 5. Run `./mvnw verify` in `services/api` until it passes.

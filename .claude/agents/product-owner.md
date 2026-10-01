@@ -31,7 +31,7 @@ Create each with `save_issue`:
 - `labels`: ["Feature"] plus every area it touches. Platforms default to web + mobile (vision: every persona uses both apps), so a UI Feature normally gets "web" and "mobile"; add "api" whenever it reads or changes data.
 - `description`: the Feature Format, filled in. In particular:
   - **Acceptance Criteria**: one scenario per behavior, with concrete values, covering error/permission/empty cases. Give every scenario a unique, descriptive name: it becomes the test name. Use a Scenario Outline with an examples table for rules with several cases.
-  - **Technical Notes**: the API endpoints (`METHOD /api/v1/…`, request and response fields, error statuses) senior-dev must define first, or "No API change"; data changes (becomes a Flyway migration), or "None"; UI states per platform.
+  - **Technical Notes**: the API endpoints (`METHOD /api/v1/…`, the role(s) allowed to call each one per `docs/architecture/adr-001-authentication.md`, or "public" with a reason; request and response fields; error statuses including 401/403) senior-dev must define first, or "No API change"; data changes (becomes a Flyway migration), or "None"; UI states per platform.
   - Payment Features that need the payment provider: say so in Technical Notes and block them on the provider decision (vision: provider not chosen yet).
 
 ## After creating the Features
