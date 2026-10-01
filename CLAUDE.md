@@ -110,6 +110,6 @@ Subagents can't start other subagents, so the main session (Lead Architect) runs
 2. PBIs in `Todo` → build them as above.
 3. Report what's waiting on the human: Epics/PBIs in `Backlog`, PRs awaiting merge, open questions in Linear comments.
 
-"Feature" (the vision's term) and "PBI" mean the same thing. Formats for Epics and Features are defined in `docs/products/vision.md` section 5; every Given/When/Then scenario gets a test named after it (API and web); mobile-only scenarios are checked manually in Expo Go and listed by name in the PR until a mobile E2E harness exists.
+"Feature" (the vision's term) and "PBI" mean the same thing. Formats for Epics and Features are defined in `docs/products/vision.md` section 5; every Given/When/Then scenario gets a test named after it (API and web); mobile-only scenarios are checked manually in Expo Go, as unticked PR checkboxes the human ticks before merging, until a mobile E2E harness exists. Scenario Outline rows are named `Scenario Outline: <name> (<row values>)`.
 
 Fall back to `.backlog/*.md` if Linear MCP is unavailable.
