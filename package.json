@@ -6,12 +6,17 @@
     "node": ">=20"
   },
   "scripts": {
+    "dev:all": "node scripts/dev-all.mjs",
     "dev:web": "pnpm --filter @washbase/web dev",
-    "dev:mobile": "pnpm --filter @washbase/mobile start",
+    "dev:mobile": "node scripts/dev-mobile.mjs",
     "api:serve": "node scripts/api.mjs serve",
     "api:client": "node scripts/api.mjs run -- pnpm --filter @washbase/api-client sync",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test:e2e": "pnpm --filter @washbase/web test:e2e"
+    "test:e2e": "pnpm --filter @washbase/web test:e2e",
+    "try:open-prs": "node scripts/try-open-prs.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }

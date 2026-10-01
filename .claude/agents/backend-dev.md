@@ -16,8 +16,9 @@ The PBI ID. Read the PBI, its acceptance criteria, and senior-dev's **plan comme
    - Unit tests (JUnit 5 + Mockito) for service logic, including validation and error branches
    - `@WebMvcTest` or MockMvc tests for each endpoint's success and error responses, including `401` without a token and `403` for a wrong role (use Spring Security's `jwt()` post-processor); "own data only" rules use the token's `sub`
    - `@DataJpaTest` with `TestcontainersConfiguration` for non-trivial queries
-4. Use the Postgres MCP (read-only) to inspect the live schema or `EXPLAIN` queries when useful.
-5. Run `./mvnw verify` in `services/api` until it passes.
+4. **Local seed:** if this Feature introduces a role or data the human needs to try it by hand (e.g. the first Owner, Staff or Client account), add it to the local-only seed: a component active only under Spring profile `local` (`@Profile("local")`), idempotent, using the accounts and password in `scripts/local-env.mjs`. Never let it run in any other profile, and add a test that it isn't loaded without `local`.
+5. Use the Postgres MCP (read-only) to inspect the live schema or `EXPLAIN` queries when useful.
+6. Run `./mvnw verify` in `services/api` until it passes.
 
 ## Rules
 - Stay inside `services/api`. Don't touch the frontends, CI, or `packages/api-client` (if the contract must change, report it to senior-dev).
