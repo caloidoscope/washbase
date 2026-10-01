@@ -14,7 +14,7 @@
 - **Client**: Wants visibility into laundry progress, service convenience (pickup/delivery/drop-off), and flexible payment options under their chosen laundry shop's brand.
 - **Employee / Staff** (called **Staff** in Epics, Features and tests): Wants a simple operational interface to intake laundry, process payments, and update order statuses smoothly as items move through processing.
 - **Owner**: Wants to manage client and employee accounts, configure pricing, customize business branding/logos, and oversee overall operations. Owners cannot manage other Owners.
-- **Admin**: The operator of the deployment (the person who sets up and maintains Washbase for a business). Creates, edits and deactivates the business's Owner accounts; the first Admin account is created when the deployment is set up. Not a day-to-day shop role.
+- **Admin**: The operator of the deployment (the person who sets up and maintains Washbase for a business). Creates, edits and deactivates the business's Owner accounts (at least one active Owner must always remain), and can also do everything an Owner can, for support. There is exactly one Admin per deployment, created when the deployment is set up; Admin actions are logged. Uses both the web and mobile apps.
 
 ---
 
