@@ -13,7 +13,8 @@
 ## 2. Core User Personas
 - **Client**: Wants visibility into laundry progress, service convenience (pickup/delivery/drop-off), and flexible payment options under their chosen laundry shop's brand.
 - **Employee / Staff** (called **Staff** in Epics, Features and tests): Wants a simple operational interface to intake laundry, process payments, and update order statuses smoothly as items move through processing.
-- **Owner / Admin**: Wants to manage client and employee accounts, configure pricing, customize business branding/logos, and oversee overall operations.
+- **Owner**: Wants to manage client and employee accounts, configure pricing, customize business branding/logos, and oversee overall operations. Owners cannot manage other Owners.
+- **Admin**: The operator of the deployment (the person who sets up and maintains Washbase for a business). Creates, edits and deactivates the business's Owner accounts; the first Admin account is created when the deployment is set up. Not a day-to-day shop role.
 
 ---
 
@@ -84,7 +85,7 @@ Epics represent broad, high-level functional modules. Break Epics down into modu
 # Epic: [Epic Title / Functional Module]
 
 ## User Intent
-**As a** [Persona: Client / Staff / Owner]  
+**As a** [Persona: Client / Staff / Owner / Admin]  
 **I want to** [high-level goal or action]  
 **So that** [business or user outcome]  
 
@@ -99,7 +100,7 @@ Each Feature is one behavior, small enough to build, test and ship in one pull r
 **Feature Format:**
 ```markdown
 # Feature: [One specific behavior, e.g. "Staff updates an order's status"]
-**Epic:** [Linear ID] · **Personas:** Client / Staff / Owner · **Platforms:** web + mobile (default) / web only / mobile only
+**Epic:** [Linear ID] · **Personas:** Client / Staff / Owner / Admin · **Platforms:** web + mobile (default) / web only / mobile only
 
 ## User Story
 **As a** [persona] **I want to** [action] **so that** [outcome]

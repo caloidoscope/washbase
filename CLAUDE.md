@@ -46,7 +46,7 @@ Never edit `src/schema.d.ts` by hand.
 
 Authentication and authorization follow **`docs/architecture/adr-001-authentication.md`** (OAuth 2.1 / OIDC, JWT). In short:
 - `services/api` embeds the authorization server (Spring Authorization Server, `com.washbase.api.auth`) and is a JWT resource server for `/api/**`.
-- **Default deny:** every `/api/**` endpoint needs a valid JWT. Public endpoints come from one explicit allowlist. Roles (`CLIENT` / `STAFF` / `OWNER`) are checked with `@PreAuthorize`; "own data only" rules are checked in services using the token's `sub`.
+- **Default deny:** every `/api/**` endpoint needs a valid JWT. Public endpoints come from one explicit allowlist. Roles (`CLIENT` / `STAFF` / `OWNER` / `ADMIN`; only `ADMIN` manages Owners) are checked with `@PreAuthorize`; "own data only" rules are checked in services using the token's `sub`.
 - Flows: Authorization Code + PKCE only. Web = confidential client via the Next.js server (tokens never reach browser JS); mobile = public client with PKCE, tokens in `expo-secure-store`.
 - Every protected endpoint has `401` (no token), `403` (wrong role) and success tests.
 - Never put signing keys, client secrets or tokens in the repo or in logs.

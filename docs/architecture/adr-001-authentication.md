@@ -8,8 +8,8 @@
 The owner wants every API to use OAuth/JWT authorization. Constraints from `docs/products/vision.md`:
 
 - **One laundry business per deployment.** Each new client gets its own forked deployment, so the auth setup is repeated per client and must stay cheap and self-contained.
-- **Three roles:** Client, Staff and Owner. Every role uses both the web app (Next.js) and the mobile app (Expo).
-- **Sign-in with email or mobile number.** Clients can register themselves, Staff and Owners create accounts, and multiple Owners are allowed. Walk-in clients are records, not users, and never sign in.
+- **Four roles:** Client, Staff, Owner, and Admin. Admin is the deployment's operator, who manages Owner accounts; Owners manage Staff and Clients but not other Owners. Every shop role uses both the web app (Next.js) and the mobile app (Expo).
+- **Sign-in with email or mobile number.** Clients can register themselves, Staff and Owners create accounts, and multiple Owners are allowed. Walk-in clients are records, not users, and never sign in. New email addresses and mobile numbers are confirmed with a one-time code (email or SMS).
 - **The business's logo**, which the Owner uploads at runtime, must appear on every screen, including sign-in.
 
 ## Decision
@@ -34,7 +34,7 @@ Embedded means one deployable per client deployment. The issuer URL is configura
 - **Login, registration, forgot-password and verification pages** are served by the authorization server and show the business's logo and name.
 
 ### Tokens
-- **Access token:** a JWT signed with an asymmetric key (RS256), valid for **15 minutes**. Claims: `iss`, `sub` (user ID), `aud`, `exp`, `iat`, `roles` (`CLIENT` / `STAFF` / `OWNER`), and `scope`.
+- **Access token:** a JWT signed with an asymmetric key (RS256), valid for **15 minutes**. Claims: `iss`, `sub` (user ID), `aud`, `exp`, `iat`, `roles` (`CLIENT` / `STAFF` / `OWNER` / `ADMIN`), and `scope`.
 - **Refresh token:** opaque, **rotated on every use**, revoked on sign-out, password change and deactivation. Lifetime 30 days (configurable).
 - **Signing keys:** supplied by environment or secret, never in the repo, and published via the JWKS endpoint so they can be rotated. Local development generates a key at startup.
 - **Deactivation:** refresh tokens are revoked immediately, and access tokens expire within 15 minutes. If immediate lock-out is ever required, add a per-request "user active" check.
@@ -44,6 +44,7 @@ Embedded means one deployable per client deployment. The issuer URL is configura
 - **Public endpoints are an explicit allowlist** in one place: `/actuator/health`, the OAuth/OIDC endpoints, the login, registration and password-reset pages, and `/v3/api-docs` and Swagger UI. The docs endpoints are controlled by one property, `washbase.security.public-api-docs`, which defaults to **`true`** and is set to `false` only in production configuration. Local runs, `pnpm api:client` (`scripts/api.mjs`) and the CI `contract` job fetch `/v3/api-docs` without a token and must keep working. A Feature that needs another public endpoint must say so in its Technical Notes.
 - **Role checks:** a `roles` claim maps to authorities, checked with `@PreAuthorize("hasRole('STAFF')")` (or similar) on the controller method.
 - **Ownership checks**, such as a Client seeing only their own orders, happen in the service layer using `sub`, never a user ID taken from the request.
+- **Bootstrap:** the first `ADMIN` account is created on a deployment's first start from deployment configuration (environment or secrets, never the repo), and only if no Admin exists yet. No Owner or Admin can be created by self-registration.
 - **Passwords** are hashed with Spring Security's `DelegatingPasswordEncoder` (bcrypt or argon2), and attempts are rate-limited on the login and reset endpoints.
 
 ### Contract and clients
