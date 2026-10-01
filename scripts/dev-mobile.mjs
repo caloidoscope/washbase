@@ -2,9 +2,10 @@
 // Run `pnpm dev:all --lan` first (in another terminal) so the API is reachable from the phone.
 import { spawn } from "node:child_process";
 import { lanAddress } from "./local-env.mjs";
+import { instance } from "./instance.mjs";
 
 const ip = lanAddress();
-const apiUrl = `http://${ip}:8080`;
+const apiUrl = `http://${ip}:${instance().apiPort}`;
 console.log(`[dev:mobile] the app will call the API at ${apiUrl}`);
 console.log("[dev:mobile] phone and PC must be on the same Wi-Fi. Wrong address? Rerun with LAN_IP=<your Wi-Fi IP>.");
 

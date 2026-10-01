@@ -14,5 +14,8 @@ if (!res.ok) {
 }
 
 const spec = await res.json();
+// The server URL depends on which port the API ran on (it differs between checkouts); clients
+// always pass their own baseUrl, so keep the committed contract independent of it.
+delete spec.servers;
 await writeFile(new URL("../openapi.json", import.meta.url), JSON.stringify(spec, null, 2) + "\n");
 console.log(`Wrote openapi.json from ${url}`);

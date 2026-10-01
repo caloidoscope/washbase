@@ -66,6 +66,10 @@ Local only, password `Washbase-Local-1`:
 
 Each account exists once the Feature that adds it is built (the Admin arrives with the sign-in foundation, CAR-17). The password is public, which is why `dev:all` listens on this PC only unless you pass `--lan`.
 
+### After testing PRs that change the database
+
+Switching between PRs can leave tables from one PR's migrations in your local database. That's tolerated, but if a PR *changed* a migration you already ran, the API refuses to start; run `pnpm db:reset` (deletes all local data in your local database) and start again.
+
 ## Other commands
 
 | Command | What it does |
@@ -74,8 +78,11 @@ Each account exists once the Feature that adds it is built (the Admin arrives wi
 | `pnpm test:e2e` | Playwright end-to-end tests (starts the API and web app itself) |
 | `pnpm api:client` | Regenerate `packages/api-client` from the API's OpenAPI spec |
 | `pnpm api:serve` | Run only the API |
+| `pnpm db:reset` | Empty your local database (local test data only) |
 | `(cd services/api && ./mvnw verify)` | API unit and integration tests (needs Docker) |
 
 ## How work happens
+
+The AI agents work in their own copy of the repo (`../washbase-agents`, a git worktree) with their own ports and database, so your folder stays on `main` and your `pnpm dev:all` never clashes with them.
 
 Ideas become Epics and Features in Linear, which the owner approves (`Backlog` → `Todo`) before AI agents build them as pull requests. The owner tests and merges each one. Details: [CLAUDE.md](CLAUDE.md) (workflow, conventions, git/PR process), [`.claude/agents/`](.claude/agents/) (the agent roles), and [docs/architecture/](docs/architecture/) (design decisions).

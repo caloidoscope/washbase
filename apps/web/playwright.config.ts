@@ -1,8 +1,14 @@
+import fs from "node:fs";
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3000;
+// Ports come from this checkout's `.washbase-instance` file, so the owner's folder and the agents'
+// worktree can run E2E at the same time. Keep the defaults in sync with scripts/instance.mjs.
+const instanceFile = path.resolve(__dirname, "../../.washbase-instance");
+const instance = fs.existsSync(instanceFile) ? JSON.parse(fs.readFileSync(instanceFile, "utf8")) : {};
+const PORT = instance.webPort ?? 3000;
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
-const apiURL = process.env.API_BASE_URL ?? "http://localhost:8080";
+const apiURL = process.env.API_BASE_URL ?? `http://localhost:${instance.apiPort ?? 8080}`;
 
 export default defineConfig({
   testDir: "./e2e",

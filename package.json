@@ -14,7 +14,8 @@
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "test:e2e": "pnpm --filter @washbase/web test:e2e",
-    "try:open-prs": "node scripts/try-open-prs.mjs"
+    "try:open-prs": "node scripts/try-open-prs.mjs",
+    "db:reset": "node scripts/db.mjs reset"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"
