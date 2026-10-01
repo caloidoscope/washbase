@@ -41,13 +41,13 @@ Embedded means one deployable per client deployment. The issuer URL is configura
 
 ### Protecting the API
 - **Default deny:** every `/api/**` endpoint requires a valid JWT. Signature, `iss`, `aud` and `exp` are all checked.
-- **Public endpoints are an explicit allowlist** in one place: `/actuator/health`, the OAuth/OIDC endpoints, the login, registration and password-reset pages, and `/v3/api-docs` and Swagger UI (non-production only). A Feature that needs another public endpoint must say so in its Technical Notes.
+- **Public endpoints are an explicit allowlist** in one place: `/actuator/health`, the OAuth/OIDC endpoints, the login, registration and password-reset pages, and `/v3/api-docs` and Swagger UI. The docs endpoints are controlled by one property, `washbase.security.public-api-docs`, which defaults to **`true`** and is set to `false` only in production configuration. Local runs, `pnpm api:client` (`scripts/api.mjs`) and the CI `contract` job fetch `/v3/api-docs` without a token and must keep working. A Feature that needs another public endpoint must say so in its Technical Notes.
 - **Role checks:** a `roles` claim maps to authorities, checked with `@PreAuthorize("hasRole('STAFF')")` (or similar) on the controller method.
 - **Ownership checks**, such as a Client seeing only their own orders, happen in the service layer using `sub`, never a user ID taken from the request.
 - **Passwords** are hashed with Spring Security's `DelegatingPasswordEncoder` (bcrypt or argon2), and attempts are rate-limited on the login and reset endpoints.
 
 ### Contract and clients
-- **OpenAPI:** declares a global `bearerAuth` (JWT) security scheme, and public endpoints opt out. The required role for each endpoint is written in its `@Operation` description.
+- **OpenAPI:** declares a global `bearerAuth` (JWT) security scheme, and public endpoints opt out. The committed `packages/api-client/openapi.json` is generated with these security settings applied, so the contract shows which endpoints need a token. The required role for each endpoint is written in its `@Operation` description.
 - **`@washbase/api-client`** gets an `openapi-fetch` middleware that adds `Authorization: Bearer <token>`. Each app supplies its own token source: the server-side session on web, secure storage on mobile.
 
 ### Testing
