@@ -42,6 +42,15 @@ The OpenAPI spec produced by `services/api` is the contract between backend and 
 
 Never edit `src/schema.d.ts` by hand.
 
+## Security (all apps)
+
+Authentication and authorization follow **`docs/architecture/adr-001-authentication.md`** (OAuth 2.1 / OIDC, JWT). In short:
+- `services/api` embeds the authorization server (Spring Authorization Server, `com.washbase.api.auth`) and is a JWT resource server for `/api/**`.
+- **Default deny:** every `/api/**` endpoint needs a valid JWT. Public endpoints come from one explicit allowlist. Roles (`CLIENT` / `STAFF` / `OWNER`) are checked with `@PreAuthorize`; "own data only" rules are checked in services using the token's `sub`.
+- Flows: Authorization Code + PKCE only. Web = confidential client via the Next.js server (tokens never reach browser JS); mobile = public client with PKCE, tokens in `expo-secure-store`.
+- Every protected endpoint has `401` (no token), `403` (wrong role) and success tests.
+- Never put signing keys, client secrets or tokens in the repo or in logs.
+
 ## Backend (Java 21 / Spring Boot)
 
 - Package by feature under `com.washbase.api.<feature>` (controller, service, repository, DTOs together); cross-cutting config in `com.washbase.api.config`.
@@ -110,6 +119,6 @@ Subagents can't start other subagents, so the main session (Lead Architect) runs
 2. PBIs in `Todo` → build them as above.
 3. Report what's waiting on the human: Epics/PBIs in `Backlog`, PRs awaiting merge, open questions in Linear comments.
 
-"Feature" (the vision's term) and "PBI" mean the same thing. Formats for Epics and Features are defined in `docs/products/vision.md` section 5; every Given/When/Then scenario gets a test named after it (API and web); mobile-only scenarios are checked manually in Expo Go, as unticked PR checkboxes the human ticks before merging, until a mobile E2E harness exists. Scenario Outline rows are named `Scenario Outline: <name> (<row values>)`.
+"Feature" (the vision's term) and "PBI" mean the same thing. Formats for Epics and Features are defined in `docs/products/vision.md` section 5; every Given/When/Then scenario gets a test named after it (API and web); the mobile side of every scenario (for Features that target mobile) is checked manually in Expo Go, as unticked PR checkboxes the human ticks before merging, until a mobile E2E harness exists. Scenario Outline rows are named `Scenario Outline: <name> (<row values>)`.
 
 Fall back to `.backlog/*.md` if Linear MCP is unavailable.

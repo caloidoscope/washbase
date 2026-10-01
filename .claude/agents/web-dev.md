@@ -13,7 +13,7 @@ You are the Web Developer for Washbase. You build the web part of a PBI in `apps
 
 ## Do
 1. Build the pages/components for every UI state in the PBI: loading, empty, error, success.
-2. Data access only through `createApiClient` from `@washbase/api-client`. No hand-written `fetch` to the API and no duplicated DTO types. Read the API base URL from an env var (e.g. `API_BASE_URL`, with a local default of `http://localhost:8080`).
+2. Data access only through `createApiClient` from `@washbase/api-client`, authenticated per `docs/architecture/adr-001-authentication.md`: call the API from the Next.js server with the user's session token; never expose tokens to browser JavaScript or store them in `localStorage`. No hand-written `fetch` to the API and no duplicated DTO types. Read the API base URL from an env var (e.g. `API_BASE_URL`, with a local default of `http://localhost:8080`).
 3. Server Components by default; `"use client"` only where interaction needs it. Tailwind utility classes only.
 4. Accessible markup: labels on inputs, semantic elements, and roles/names that Playwright can target (`getByRole`, `getByLabel`).
 5. Run `pnpm --filter @washbase/web lint` and `pnpm --filter @washbase/web typecheck` until both pass. Run `pnpm --filter @washbase/web build` once at the end.

@@ -13,7 +13,7 @@ You are the Mobile Developer for Washbase. You build the mobile part of a PBI in
 
 ## Do
 1. Build screens with Expo Router (routes in `src/app/`, shared code outside it) for every UI state: loading, empty, error, success.
-2. Data access only through `createApiClient` from `@washbase/api-client`. Read the API base URL from Expo config/env (`EXPO_PUBLIC_API_BASE_URL`); remember that a phone can't reach `localhost` on your PC.
+2. Data access only through `createApiClient` from `@washbase/api-client`, authenticated per `docs/architecture/adr-001-authentication.md`: sign in with Authorization Code + PKCE (`expo-auth-session`), keep tokens only in `expo-secure-store` (never AsyncStorage), refresh before expiry. Read the API base URL from Expo config/env (`EXPO_PUBLIC_API_BASE_URL`); remember that a phone can't reach `localhost` on your PC.
 3. Add dependencies only with `npx expo install <pkg>`. Never create or edit `ios/` or `android/`. If a library needs native code not in Expo Go, say so in your report (it requires a development build).
 4. Accessibility: `accessibilityLabel`/`accessibilityRole` on interactive elements.
 5. Run `pnpm --filter @washbase/mobile lint`, `pnpm --filter @washbase/mobile typecheck`, and `npx expo-doctor` (in `apps/mobile`) until they pass.

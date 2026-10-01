@@ -13,7 +13,7 @@ Preconditions: the PBI is in `Todo` and every issue in its `blockedBy` is `Done`
 1. Read the PBI (`get_issue` with relations), its comments, and its parent Epic.
 2. Create the branch from an up-to-date `main`: `git switch main && git pull --ff-only && git switch -c feat/<ID>-<short-title>` (e.g. `feat/CAR-7-pickup-slots`). Move the PBI to `In Progress`.
 3. **Define the API contract first** (skip if the PBI says "No API change"):
-   - In `services/api`, add the controller(s) with the final paths, request/response DTOs as Java records with Jakarta Validation, and Springdoc annotations (`@Operation`, `@ApiResponse` for each error status). Method bodies may throw `ResponseStatusException(NOT_IMPLEMENTED)`; backend-dev fills them in.
+   - In `services/api`, add the controller(s) with the final paths and their authorization (`@PreAuthorize` roles, documented in `@Operation`; see `docs/architecture/adr-001-authentication.md`), request/response DTOs as Java records with Jakarta Validation, and Springdoc annotations (`@Operation`, `@ApiResponse` for each error status). Method bodies may throw `ResponseStatusException(NOT_IMPLEMENTED)`; backend-dev fills them in.
    - Add the Flyway migration if the data model changes (`V<next>__<desc>.sql`) and the JPA entities.
    - Run `pnpm api:client` from the repo root (needs `docker compose up -d`). It builds the API, starts it, regenerates the client and stops it; an API already running on 8080 is reused, so stop any stale one first. Confirm `packages/api-client` changed as intended.
 4. Post a **plan comment** on the PBI:
@@ -32,7 +32,7 @@ Report: branch name, contract summary, and the task list per agent.
    - Contract-first respected: the frontends use `@washbase/api-client` only; the regenerated client matches the API
    - Patterns: package-by-feature, records for DTOs, no entities in controllers, Server Components by default, `npx expo install` for native deps
    - Tests exist for the service logic and the controller (MockMvc) paths, and every acceptance-criteria scenario has a test named after it
-   - Security: no secrets, input validated, no SQL string building
+   - Security per `docs/architecture/adr-001-authentication.md`: every new endpoint is protected by default with the right role (`@PreAuthorize`), public endpoints only via the allowlist, "own data" checks use the token's `sub`, tests cover 401/403/success; no secrets or tokens in code or logs; input validated; no SQL string building
 2. Fix small issues yourself (naming, missing annotations, tiny refactors). For anything larger, don't fix it: list it.
 
 Report: `APPROVED` or `CHANGES REQUESTED`, with concrete findings (file:line, what's wrong, which agent should fix it).
