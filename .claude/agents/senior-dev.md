@@ -8,10 +8,10 @@ You are the Senior Developer for Washbase. Follow `CLAUDE.md` (layout, conventio
 
 ## Mode 1: Plan (PBI just approved)
 
-Preconditions: the PBI is in `Todo` and every issue in its `blockedBy` is `Done`. If not, stop and report why.
+Preconditions: the PBI is in `Todo`, and every issue in its `blockedBy` is either `Done` (merged) or has an **open PR** (stacking, see `CLAUDE.md`). A blocker with neither (e.g. still in `Backlog`, or a human decision like a provider choice) means stop and report why.
 
 1. Read the PBI (`get_issue` with relations), its comments, and its parent Epic.
-2. Create the branch from an up-to-date `main`: `git switch main && git pull --ff-only && git switch -c feat/<ID>-<short-title>` (e.g. `feat/CAR-7-pickup-slots`). Move the PBI to `In Progress`.
+2. Create the branch `feat/<ID>-<short-title>` (e.g. `feat/CAR-7-pickup-slots`): from an up-to-date `main` if every blocker is merged; otherwise from the open blocker PR's branch (`git fetch && git switch -c feat/<ID>-<title> origin/<blocker branch>`). If two blockers both have open PRs on different branches, stop and report (the human should merge one first). Note the base branch in the plan comment. Move the PBI to `In Progress`.
 3. **Define the API contract first** (skip if the PBI says "No API change"):
    - In `services/api`, add the controller(s) with the final paths and their authorization (`@PreAuthorize` roles, documented in `@Operation`; see `docs/architecture/adr-001-authentication.md`), request/response DTOs as Java records with Jakarta Validation, and Springdoc annotations (`@Operation`, `@ApiResponse` for each error status). Method bodies may throw `ResponseStatusException(NOT_IMPLEMENTED)`; backend-dev fills them in.
    - Add the Flyway migration if the data model changes (`V<next>__<desc>.sql`) and the JPA entities.

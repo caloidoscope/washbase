@@ -78,6 +78,21 @@ Authentication and authorization follow **`docs/architecture/adr-001-authenticat
 - `eas build --local` only runs on macOS/Linux (use WSL2 on Windows); iOS builds need macOS, so use EAS cloud builds for iOS. Day-to-day testing on a phone: Expo Go.
 - The API base URL comes from `EXPO_PUBLIC_API_BASE_URL`; a phone can't reach `localhost` on the dev machine, so use its LAN IP.
 
+## Manual testing (local)
+
+```bash
+gh pr checkout <n>        # one PR, or: pnpm try:open-prs  (all open PRs combined on a throwaway local branch)
+pnpm install
+pnpm dev:all              # Postgres + API (:8080) + web (:3000), on this PC only; Ctrl+C stops all
+pnpm dev:all --lan        # same, but reachable from your Wi-Fi: needed only for testing on a phone
+pnpm dev:mobile           # second terminal: Expo for Expo Go, API pointed at this PC's LAN address
+git switch main           # when done
+```
+
+- Local test accounts (password `Washbase-Local-1`): `admin@example.com`, `owner@example.com`, `staff@example.com`, `client@example.com`, defined in `scripts/local-env.mjs`. The Admin comes from the bootstrap; the others come from a **local-only seed** (Spring profile `local`, which `dev:all` activates). When a Feature introduces a role or data needed to try it by hand, it adds that to the seed. The seed must never run outside the `local` profile.
+- Every Feature PR has a **"How to test this PR"** section: commands, which account to use for each scenario, and the manual checklist.
+- `pnpm try:open-prs` makes `preview/all-open-prs` (main + every open PR, merged locally). Never push it (a plain `git push` fails on it). PRs that conflict are skipped and listed.
+
 ## Git workflow
 
 - `main` is protected by convention: all work lands through PRs.
@@ -111,7 +126,9 @@ Subagents can't start other subagents, so the main session (Lead Architect) runs
 
 ### Building a PBI in `Todo` (one at a time, in `blockedBy` order)
 
-1. `senior-dev` (plan) → 2. `backend-dev` (if `api`) → 3. `web-dev` and/or `mobile-dev` (if `web`/`mobile`; may run in parallel) → 4. `senior-dev` (review; on `CHANGES REQUESTED`, send findings to the named agent and review again) → 5. `build-qa` (on a failed check it names the agent to fix it; loop) → 6. the human merges → move the PBI to `Done`, and the Epic to `Done` when all its PBIs are.
+**Stacking:** a Feature doesn't wait for its prerequisites to be *merged*. If a `blockedBy` Feature has an open PR (not yet merged), the next Feature branches from that PR's branch and its PR targets that branch, so several Features can be in progress for the human to test together (`pnpm try:open-prs`). The human merges stacked PRs bottom-up. After a lower PR is squash-merged, `build-qa` rebases the next PR onto `main` (`git rebase --onto origin/main <old base> <branch>`, `git push --force-with-lease`, `gh pr edit <n> --base main`) and re-runs its checks.
+
+1. `senior-dev` (plan) → 2. `backend-dev` (if `api`) → 3. `web-dev` and/or `mobile-dev` (if `web`/`mobile`; may run in parallel) → 4. `senior-dev` (review; on `CHANGES REQUESTED`, send findings to the named agent and review again) → 5. `build-qa` (on a failed check it names the agent to fix it; loop) → 6. the human tests (see Manual testing) and merges → move the PBI to `Done`, and the Epic to `Done` when all its PBIs are; restack any PR that was based on the merged one.
 
 ### "Check Linear"
 

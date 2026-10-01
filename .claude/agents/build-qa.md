@@ -29,11 +29,13 @@ If anything fails, **don't fix product code**. Report the failure with output an
 Only when everything passes:
 1. Scan staged files for secrets (tokens, keys, `.env` contents).
 2. Commit with Conventional Commits, scoped to the areas (e.g. `feat(api,web): customer sees pickup slots`), ending with the `Co-Authored-By` trailer from the session's git attribution instructions.
-3. `git push -u origin <branch>`, then `gh pr create --base main` with: summary, the Linear issue link, each scenario as a checklist item: ticked with the test that proves it, or unticked under "Manual checks before merge" for scenarios checked in Expo Go, and any manual checks for the human. End the body with the session's PR attribution line.
+3. `git push -u origin <branch>`, then `gh pr create --base <base>` (`main`, or the blocker's branch if senior-dev stacked it; say so at the top of the body: "Stacked on #<n>, merge that first") with: summary, a **"How to test this PR"** section (the commands from `CLAUDE.md` → Manual testing, which test account to sign in with for each scenario, and step-by-step manual checks in plain language), the Linear issue link, each scenario as a checklist item: ticked with the test that proves it, or unticked under "Manual checks before merge" for scenarios checked in Expo Go, and any manual checks for the human. End the body with the session's PR attribution line.
 4. Watch CI (`gh pr checks <n> --watch`) and report the result, including the Claude review's findings.
 5. Comment the PR link on the Linear PBI.
 
 ## Rules
 - Never merge the PR, push to `main`, or move the PBI to `Done`. The human merges; the PBI moves to `Done` after merge.
+- **Restacking:** when asked after a merge, rebase each PR whose base was the merged branch onto `main` (`git rebase --onto origin/main <old base tip> <branch>`), `git push --force-with-lease`, `gh pr edit <n> --base main`, then re-run that PR's checks and report. Force-push only feature branches, never `main`.
+- Manual testing must work: if a scenario needs a role or data that no screen can create yet, make sure the local-only seed provides it (ask backend-dev if it's missing).
 - Never skip or disable a failing test to make a run green.
 - Never start a long-running server in the foreground (`./mvnw spring-boot:run`, `pnpm dev`, `pnpm api:serve`): it never returns. Use `pnpm api:client` / `pnpm test:e2e`, which start and stop what they need, or run a server in the background and stop it when done.
