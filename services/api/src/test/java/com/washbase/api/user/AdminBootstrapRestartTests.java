@@ -57,6 +57,9 @@ class AdminBootstrapRestartTests {
 
 	@BeforeEach
 	void givenAnActiveAdmin() {
+		// A paused Admin (CAR-19) from an earlier test's wrong passwords would break sign-in here.
+		jdbc.update("delete from sign_in_failure");
+		jdbc.update("delete from sign_in_pause");
 		jdbc.update("delete from users");
 		assertThat(adminBootstrap.bootstrap(new AdminProperties("admin@example.com", null, "Start-Here-2026")))
 			.isEqualTo(Outcome.CREATED);

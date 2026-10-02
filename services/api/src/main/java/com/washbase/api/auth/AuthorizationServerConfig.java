@@ -1,12 +1,15 @@
 package com.washbase.api.auth;
 
 import java.net.URI;
+import java.util.Map;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcOperations;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -17,6 +20,8 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.ExceptionMappingAuthenticationFailureHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -36,7 +41,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * ({@link SessionEndingAuthorizationResponseHandler}): the web app keeps its own session, and nothing can sign
  * someone back in without their password after sign-out or refresh-token reuse.</li>
  * <li>{@link #loginSecurityFilterChain}: {@code GET /login} (page) and {@code POST /login} (form, CSRF protected).
- * Public.</li>
+ * Public. Repeated failed sign-ins for one identifier pause sign-in for it ({@link PausingAuthenticationProvider},
+ * CAR-19).</li>
  * </ol>
  * Only Authorization Code + PKCE (plus the refresh token grant it leads to) is possible: the registered clients
  * allow no other grant (see {@link RegisteredClients}). Refresh tokens are rotated on every use, and presenting a
@@ -45,7 +51,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * that is no longer current at once ({@code com.washbase.api.config.SecurityConfig}).
  */
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(AuthProperties.class)
+@EnableConfigurationProperties({ AuthProperties.class, SignInLimitProperties.class })
 class AuthorizationServerConfig {
 
 	static final int AUTHORIZATION_SERVER_CHAIN_ORDER = 1;
@@ -56,6 +62,12 @@ class AuthorizationServerConfig {
 
 	/** Where the sign-in page sends the browser after any failure; the page then shows the one generic message. */
 	static final String LOGIN_FAILURE_URL = LOGIN_PAGE + "?error";
+
+	/**
+	 * Where the sign-in page sends the browser when sign-in for the typed identifier is paused
+	 * ({@link SignInPausedException}, CAR-19); the page then shows "Too many attempts. Try again in 15 minutes.".
+	 */
+	static final String LOGIN_PAUSED_URL = LOGIN_PAGE + "?paused";
 
 	@Bean
 	@Order(AUTHORIZATION_SERVER_CHAIN_ORDER)
@@ -80,12 +92,20 @@ class AuthorizationServerConfig {
 
 	@Bean
 	@Order(LOGIN_CHAIN_ORDER)
-	SecurityFilterChain loginSecurityFilterChain(HttpSecurity http, AuthProperties authProperties) throws Exception {
+	SecurityFilterChain loginSecurityFilterChain(HttpSecurity http, AuthProperties authProperties,
+			UserAccountDetailsService userDetailsService, PasswordEncoder passwordEncoder, SignInAttempts attempts)
+			throws Exception {
+		// Pause sign-in after repeated wrong passwords (CAR-19). The pausing provider is this chain's whole
+		// AuthenticationManager (no parent): falling back to the global one would check the password again and
+		// bypass the pause.
+		DaoAuthenticationProvider passwords = new DaoAuthenticationProvider(userDetailsService);
+		passwords.setPasswordEncoder(passwordEncoder);
+		http.authenticationManager(new ProviderManager(new PausingAuthenticationProvider(passwords, attempts)));
 		http.securityMatcher(LOGIN_PAGE)
 			.authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
 			// CSRF stays on (default): the template includes the token via th:action.
 			.formLogin(form -> form.loginPage(LOGIN_PAGE)
-				.failureUrl(LOGIN_FAILURE_URL)
+				.failureHandler(loginFailureHandler())
 				// Normally the saved /oauth2/authorize request is resumed. Someone who opened /login directly is
 				// sent to the web app, which signs them in through the normal flow without asking again.
 				.defaultSuccessUrl(webAppHome(authProperties), false)
@@ -122,6 +142,14 @@ class AuthorizationServerConfig {
 	OAuth2AuthorizationConsentService authorizationConsentService(JdbcOperations jdbcOperations,
 			RegisteredClientRepository registeredClientRepository) {
 		return new JdbcOAuth2AuthorizationConsentService(jdbcOperations, registeredClientRepository);
+	}
+
+	/** A paused sign-in goes to {@link #LOGIN_PAUSED_URL}; every other failure to {@link #LOGIN_FAILURE_URL}. */
+	static AuthenticationFailureHandler loginFailureHandler() {
+		ExceptionMappingAuthenticationFailureHandler handler = new ExceptionMappingAuthenticationFailureHandler();
+		handler.setDefaultFailureUrl(LOGIN_FAILURE_URL);
+		handler.setExceptionMappings(Map.of(SignInPausedException.class.getName(), LOGIN_PAUSED_URL));
+		return handler;
 	}
 
 	/** The web app's origin ({@code http://localhost:3000/} for the default redirect URI). */
