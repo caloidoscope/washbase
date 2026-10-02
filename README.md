@@ -80,6 +80,7 @@ Switching between PRs can leave tables from one PR's migrations in your local da
 |---|---|
 | `pnpm lint` / `pnpm typecheck` | Lint and typecheck web, mobile and the API client |
 | `pnpm test:e2e` | Playwright end-to-end tests (starts the API and web app itself) |
+| `pnpm test:e2e:watch [name]` | Same, but in a visible, slowed-down browser so you can watch each scenario, e.g. `pnpm test:e2e:watch stay-signed-in` |
 | `pnpm api:client` | Regenerate `packages/api-client` from the API's OpenAPI spec |
 | `pnpm api:serve` | Run only the API |
 | `pnpm db:reset` | Empty your local database (local test data only) |
