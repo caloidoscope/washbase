@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.washbase.api.TestcontainersConfiguration;
 import com.washbase.api.auth.SignInFlow;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +18,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -36,6 +38,16 @@ class DeploymentWithoutAdminSettingsTests {
 
 	@Autowired
 	private UserAccountRepository users;
+
+	@Autowired
+	private JdbcTemplate jdbc;
+
+	@BeforeEach
+	void noSignInPauses() {
+		// The wrong passwords below must never meet a pause (CAR-19) left by another test in this context.
+		jdbc.update("delete from sign_in_failure");
+		jdbc.update("delete from sign_in_pause");
+	}
 
 	@Test
 	@DisplayName("Scenario: A deployment without Admin settings still starts")

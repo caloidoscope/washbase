@@ -52,6 +52,9 @@ class AuthorizationEndpointsTests {
 
 	@BeforeEach
 	void givenTheAdmin() {
+		// A paused Admin (CAR-19) from an earlier test's wrong passwords would break sign-in here.
+		jdbc.update("delete from sign_in_failure");
+		jdbc.update("delete from sign_in_pause");
 		jdbc.update("delete from oauth2_authorization");
 		jdbc.update("delete from users");
 		AdminBootstrapping.startWith(context, "admin@example.com", null, PASSWORD);

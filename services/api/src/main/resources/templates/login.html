@@ -26,6 +26,8 @@
   <h1>Washbase</h1>
   <!-- One message for every failure: never reveals whether an account exists or is active. -->
   <p class="error" role="alert" th:if="${param.error}">Incorrect email, mobile number or password.</p>
+  <!-- CAR-19: the same for known and unknown identifiers. Text from LoginController#pausedMessage. -->
+  <p class="error" role="alert" th:if="${param.paused}" th:text="${pausedMessage}">Too many attempts. Try again in 15 minutes.</p>
   <!-- th:action adds the CSRF token. Field names are Spring Security's form-login defaults. -->
   <form method="post" th:action="@{/login}">
     <label for="username">Email or mobile number</label>
