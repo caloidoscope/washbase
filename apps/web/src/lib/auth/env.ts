@@ -14,9 +14,21 @@ export interface AuthEnv {
   redirectUri: URL;
   /** `SESSION_SECRET`, required, at least 32 characters. Encrypts the session and transaction cookies. */
   sessionSecret: string;
+  /** `SESSION_MAX_AGE_DAYS` (whole days, 1 to 400, default 30) in seconds: how long a session lasts without use.
+   *  Each renewal re-sets it in full (CAR-18). Keep it equal to the API's `WASHBASE_AUTH_REFRESH_TOKEN_TTL`. */
+  sessionMaxAgeSeconds: number;
+  /** The web app's home, `/` on `redirectUri`'s origin: the `post_logout_redirect_uri` for RP-initiated logout.
+   *  Derived, no variable of its own: the API registers the same URI from `WASHBASE_WEB_REDIRECT_URI`. */
+  postLogoutRedirectUri: URL;
+  /** `redirectUri`'s origin: the only `Origin` accepted by `POST /auth/logout` (CSRF check). */
+  appOrigin: string;
 }
 
 const MIN_SESSION_SECRET_LENGTH = 32;
+const DEFAULT_SESSION_MAX_AGE_DAYS = 30;
+/** Browsers cap a cookie's lifetime at 400 days. */
+const MAX_SESSION_MAX_AGE_DAYS = 400;
+const SECONDS_PER_DAY = 24 * 60 * 60;
 
 /** The variable's value, or `fallback` when unset or blank. */
 function optional(name: string, fallback: string): string {
@@ -45,6 +57,17 @@ function httpUrl(name: string, value: string): URL {
   return url;
 }
 
+/** `SESSION_MAX_AGE_DAYS` in seconds. Throws, naming the variable (never its value), unless it is a whole number of
+ *  days from 1 to 400. */
+function sessionMaxAgeSeconds(): number {
+  const value = optional("SESSION_MAX_AGE_DAYS", String(DEFAULT_SESSION_MAX_AGE_DAYS));
+  const days = /^\d+$/.test(value) ? Number(value) : NaN;
+  if (!Number.isInteger(days) || days < 1 || days > MAX_SESSION_MAX_AGE_DAYS) {
+    throw new Error(`SESSION_MAX_AGE_DAYS must be a whole number of days from 1 to ${MAX_SESSION_MAX_AGE_DAYS}`);
+  }
+  return days * SECONDS_PER_DAY;
+}
+
 /**
  * Reads and validates the settings from `process.env` on each call, at request time, never at module load:
  * `next build` (CI) runs without these variables.
@@ -61,13 +84,18 @@ export function authEnv(): AuthEnv {
     throw new Error(`SESSION_SECRET must be at least ${MIN_SESSION_SECRET_LENGTH} characters`);
   }
 
+  const redirectUri = httpUrl("AUTH_REDIRECT_URI", optional("AUTH_REDIRECT_URI", "http://localhost:3000/auth/callback"));
+
   return {
     apiBaseUrl,
     // Kept exactly as configured: openid-client compares it with the discovery document's `issuer`.
     issuer: httpUrl("AUTH_ISSUER", optional("AUTH_ISSUER", "http://localhost:8080")),
     clientId: optional("AUTH_CLIENT_ID", "washbase-web"),
     clientSecret: required("AUTH_CLIENT_SECRET"),
-    redirectUri: httpUrl("AUTH_REDIRECT_URI", optional("AUTH_REDIRECT_URI", "http://localhost:3000/auth/callback")),
+    redirectUri,
     sessionSecret,
+    sessionMaxAgeSeconds: sessionMaxAgeSeconds(),
+    postLogoutRedirectUri: new URL("/", redirectUri.origin),
+    appOrigin: redirectUri.origin,
   };
 }
