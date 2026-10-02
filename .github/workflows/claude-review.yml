@@ -39,5 +39,8 @@ jobs:
             described in the PR body. Skip style nits that lint already covers.
             Leave inline comments for specific issues and one short summary comment ending in
             APPROVED or CHANGES REQUESTED.
+          # Show the reviewer's full output in the job log, so denied tools and errors are visible.
+          show_full_output: true
+          # Read-only access to the checkout (files, diffs, history) plus the PR comment tools.
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"

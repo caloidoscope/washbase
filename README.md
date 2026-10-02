@@ -51,7 +51,11 @@ pnpm dev:all
 git switch main         # when done
 ```
 
-`try:open-prs` rebuilds the combined branch fresh on every run and never pushes it. It skips (and lists) PRs that conflict with the others and PRs from forks, which you'd test on their own with `gh pr checkout` after reviewing their code.
+`try:open-prs` rebuilds the combined branch fresh on every run and never pushes it. It skips (and lists) PRs that conflict with the others and PRs from forks, which you'd test on their own with `gh pr checkout` after reviewing their code. If GitHub can't be reached, it says so and shows how to test branches already on your machine.
+
+### Merging
+
+Merge with the **Merge button on github.com** (its "Delete branch" only deletes GitHub's copy, which is safe). Merge stacked PRs oldest first. Avoid `gh pr merge --delete-branch` in a terminal: it also deletes the local branch, which removes the AI agents' working copy if that branch is checked out there.
 
 ### Local test accounts
 
@@ -59,7 +63,7 @@ Local only, password `Washbase-Local-1`:
 
 | Role | Sign in with |
 |---|---|
-| Admin | `admin@example.com` |
+| Admin | `admin@example.com` or mobile `09171234567` |
 | Owner | `owner@example.com` |
 | Staff | `staff@example.com` |
 | Client | `client@example.com` |
@@ -76,6 +80,7 @@ Switching between PRs can leave tables from one PR's migrations in your local da
 |---|---|
 | `pnpm lint` / `pnpm typecheck` | Lint and typecheck web, mobile and the API client |
 | `pnpm test:e2e` | Playwright end-to-end tests (starts the API and web app itself) |
+| `pnpm test:e2e:watch [name]` | Same, but in a visible, slowed-down browser so you can watch each scenario, e.g. `pnpm test:e2e:watch stay-signed-in` |
 | `pnpm api:client` | Regenerate `packages/api-client` from the API's OpenAPI spec |
 | `pnpm api:serve` | Run only the API |
 | `pnpm db:reset` | Empty your local database (local test data only) |

@@ -15,6 +15,7 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "test:e2e": "pnpm --filter @washbase/web test:e2e",
+    "test:e2e:watch": "pnpm --filter @washbase/web test:e2e:watch",
     "try:open-prs": "node scripts/try-open-prs.mjs",
     "db:reset": "node scripts/db.mjs reset"
   },

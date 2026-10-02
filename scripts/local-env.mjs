@@ -5,7 +5,7 @@ import os from "node:os";
 /** Accounts for manual testing. The Admin comes from the bootstrap (ADR-001); the others are
  *  created by the local-only seed once the Features that introduce those roles exist. */
 export const LOCAL_ACCOUNTS = [
-  { role: "Admin", email: "admin@example.com" },
+  { role: "Admin", email: "admin@example.com", mobile: "09171234567" },
   { role: "Owner", email: "owner@example.com" },
   { role: "Staff", email: "staff@example.com" },
   { role: "Client", email: "client@example.com" },
@@ -68,7 +68,10 @@ export function lanAddress() {
 
 export function printAccounts() {
   console.log("\nTest accounts (local only):");
-  for (const a of LOCAL_ACCOUNTS) console.log(`  ${a.role.padEnd(7)} ${a.email.padEnd(20)} ${LOCAL_PASSWORD}`);
+  for (const a of LOCAL_ACCOUNTS) {
+    const signIn = a.mobile ? `${a.email} or ${a.mobile}` : a.email;
+    console.log(`  ${a.role.padEnd(7)} ${signIn.padEnd(36)} ${LOCAL_PASSWORD}`);
+  }
   console.log("  (Each account exists once the Feature that adds it is built: the Admin with the sign-in");
   console.log("  foundation, CAR-17. The Admin may be asked to change the password at first sign-in.)\n");
 }
