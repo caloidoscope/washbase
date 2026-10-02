@@ -85,7 +85,7 @@ class SignInTests {
 	@Test
 	@DisplayName("Scenario: The Admin signs in with their email address")
 	void adminSignsInWithEmail(CapturedOutput output) throws Exception {
-		assertThat(AdminBootstrapping.startWith(context, "admin@example.com", null, PASSWORD)).isEqualTo("CREATED");
+		assertThat(AdminBootstrapping.startWithChosenPassword(context, "admin@example.com", null, PASSWORD)).isEqualTo("CREATED");
 		UserAccount admin = users.findByEmail("admin@example.com").orElseThrow();
 
 		String accessToken = new SignInFlow(mockMvc).signIn("admin@example.com", PASSWORD);
@@ -114,7 +114,7 @@ class SignInTests {
 			name = "Scenario Outline: The Admin signs in with their mobile number in either common format ({0}, {1})")
 	@CsvSource({ "09171234567, 09171234567", "09171234567, +639171234567", "+639171234567, 09171234567" })
 	void adminSignsInWithMobile(String configured, String typed) throws Exception {
-		assertThat(AdminBootstrapping.startWith(context, null, configured, PASSWORD)).isEqualTo("CREATED");
+		assertThat(AdminBootstrapping.startWithChosenPassword(context, null, configured, PASSWORD)).isEqualTo("CREATED");
 
 		String accessToken = new SignInFlow(mockMvc).signIn(typed, PASSWORD);
 
@@ -128,7 +128,7 @@ class SignInTests {
 	@Test
 	@DisplayName("Scenario: Signing in with a wrong password is refused")
 	void wrongPasswordRefused(CapturedOutput output) throws Exception {
-		AdminBootstrapping.startWith(context, "admin@example.com", null, PASSWORD);
+		AdminBootstrapping.startWithChosenPassword(context, "admin@example.com", null, PASSWORD);
 		SignInFlow browser = new SignInFlow(mockMvc);
 		browser.authorize();
 
@@ -145,7 +145,7 @@ class SignInTests {
 	@Test
 	@DisplayName("Scenario: Signing in with an email that has no account shows the same message")
 	void unknownEmailSameMessage(CapturedOutput output) throws Exception {
-		AdminBootstrapping.startWith(context, "admin@example.com", null, PASSWORD);
+		AdminBootstrapping.startWithChosenPassword(context, "admin@example.com", null, PASSWORD);
 		SignInFlow browser = new SignInFlow(mockMvc);
 		browser.authorize();
 
@@ -160,7 +160,7 @@ class SignInTests {
 	@Test
 	@DisplayName("Emails are matched case-insensitively (Admin@Example.com = admin@example.com)")
 	void emailCaseInsensitive() throws Exception {
-		AdminBootstrapping.startWith(context, "admin@example.com", null, PASSWORD);
+		AdminBootstrapping.startWithChosenPassword(context, "admin@example.com", null, PASSWORD);
 
 		String accessToken = new SignInFlow(mockMvc).signIn("  Admin@Example.com ", PASSWORD);
 
@@ -224,7 +224,7 @@ class SignInTests {
 	@Test
 	@DisplayName("Signing in without a CSRF token is refused (403)")
 	void signInWithoutCsrfRefused() throws Exception {
-		AdminBootstrapping.startWith(context, "admin@example.com", null, PASSWORD);
+		AdminBootstrapping.startWithChosenPassword(context, "admin@example.com", null, PASSWORD);
 
 		mockMvc.perform(post("/login").param("username", "admin@example.com").param("password", PASSWORD))
 			.andExpect(status().isForbidden());
@@ -233,7 +233,7 @@ class SignInTests {
 	@Test
 	@DisplayName("Opening /login directly and signing in goes to the web app's home page")
 	void directSignInGoesToWebApp() throws Exception {
-		AdminBootstrapping.startWith(context, "admin@example.com", null, PASSWORD);
+		AdminBootstrapping.startWithChosenPassword(context, "admin@example.com", null, PASSWORD);
 		SignInFlow browser = new SignInFlow(mockMvc);
 
 		MockHttpServletResponse response = browser.submitSignIn("admin@example.com", PASSWORD);

@@ -83,6 +83,12 @@ public class UserAccount {
 		this.mustChangePassword = true;
 	}
 
+	/** Stores the password the person chose and ends the obligation to choose one (CAR-21). */
+	public void changePassword(String newPasswordHash) {
+		this.passwordHash = newPasswordHash;
+		this.mustChangePassword = false;
+	}
+
 	@PrePersist
 	void onCreate() {
 		Instant now = Instant.now();

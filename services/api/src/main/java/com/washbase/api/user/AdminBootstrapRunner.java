@@ -6,6 +6,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.dao.DataAccessException;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
@@ -14,6 +15,7 @@ import org.springframework.transaction.TransactionException;
  * values) and never stops the API from starting.
  */
 @Component
+@Order(1)
 @EnableConfigurationProperties(AdminProperties.class)
 class AdminBootstrapRunner implements ApplicationRunner {
 

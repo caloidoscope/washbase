@@ -122,7 +122,7 @@ class SigningKeyStartupTests {
 				"--spring.datasource.url=" + postgres.getJdbcUrl(),
 				"--spring.datasource.username=" + postgres.getUsername(),
 				"--spring.datasource.password=" + postgres.getPassword(), "--washbase.admin.email=admin@example.com",
-				"--washbase.admin.mobile=", "--washbase.admin.initial-password=" + PASSWORD));
+				"--washbase.admin.mobile=", "--washbase.admin.require-password-change=false", "--washbase.admin.initial-password=" + PASSWORD));
 		args.addAll(List.of(settings));
 		return new SpringApplicationBuilder(ApiApplication.class).run(args.toArray(String[]::new));
 	}

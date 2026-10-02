@@ -3,6 +3,9 @@ package com.washbase.api.user;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +42,17 @@ class AdminBootstrap {
 
 	private final PasswordEncoder passwordEncoder;
 
-	AdminBootstrap(UserAccountRepository users, PasswordEncoder passwordEncoder) {
+	private final JdbcOperations jdbc;
+
+	/** Whether a newly created Admin must choose a new password at first sign-in (always, except local and E2E runs). */
+	private final boolean requirePasswordChange;
+
+
+	@Autowired
+	AdminBootstrap(UserAccountRepository users, PasswordEncoder passwordEncoder, JdbcOperations jdbc,
+			@Value("${washbase.admin.require-password-change:true}") boolean requirePasswordChange) {
+		this.jdbc = jdbc;
+		this.requirePasswordChange = requirePasswordChange;
 		this.users = users;
 		this.passwordEncoder = passwordEncoder;
 	}
@@ -92,13 +105,15 @@ class AdminBootstrap {
 			// No active Admin exists, so this one is inactive: restore it instead of creating a duplicate.
 			account.reactivate(passwordEncoder.encode(settings.initialPassword()));
 			users.saveAndFlush(account);
+			// The old password may have been stolen: sessions and tokens from before the restore end now (CAR-21).
+			jdbc.update("delete from oauth2_authorization where principal_name = ?", account.getId().toString());
 			log.warn("Reactivated the inactive Admin account matching the Admin settings and reset its password; "
 					+ "the Admin must change it at the next sign-in.");
 			return Outcome.REACTIVATED;
 		}
 
 		users.saveAndFlush(new UserAccount(ADMIN_NAME, email, mobile,
-				passwordEncoder.encode(settings.initialPassword()), Role.ADMIN, true));
+				passwordEncoder.encode(settings.initialPassword()), Role.ADMIN, requirePasswordChange));
 		log.info("Created the Admin account from the Admin settings; the Admin must change the initial password "
 				+ "at the first sign-in.");
 		return Outcome.CREATED;
