@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import concurrently from "concurrently";
-import { localApiEnv, printAccounts } from "./local-env.mjs";
+import { localApiEnv, localWebEnv, printAccounts } from "./local-env.mjs";
 import { instance } from "./instance.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -44,7 +44,8 @@ const { result } = concurrently(
     {
       name: "web",
       command: `pnpm --filter @washbase/web dev --hostname ${bindAddress} --port ${inst.webPort}`,
-      env: { API_BASE_URL: `http://127.0.0.1:${inst.apiPort}` },
+      // AUTH_ISSUER stays `localhost` (it must equal the API's issuer); server-side API calls go to 127.0.0.1.
+      env: { ...localWebEnv(inst), API_BASE_URL: `http://127.0.0.1:${inst.apiPort}` },
       prefixColor: "blue",
     },
   ],

@@ -1,4 +1,5 @@
-// Settings shared by the local manual-testing scripts. Local only: never used in CI or production.
+// Settings shared by the local manual-testing scripts and E2E (Playwright, also in CI). Never used in production:
+// every value here is publicly known.
 import os from "node:os";
 
 /** Accounts for manual testing. The Admin comes from the bootstrap (ADR-001); the others are
@@ -13,15 +14,38 @@ export const LOCAL_PASSWORD = "Washbase-Local-1";
 /** Secret of the `washbase-web` OAuth client for local runs and tests. Publicly known, like LOCAL_PASSWORD:
  *  never use it in a real deployment. */
 export const LOCAL_WEB_CLIENT_SECRET = "washbase-web-local-secret";
+/** Key that encrypts the web app's session cookies for local runs and tests (at least 32 characters).
+ *  Publicly known: never use it in a real deployment. */
+export const LOCAL_SESSION_SECRET = "washbase-local-session-secret-not-for-production";
 
-/** Environment for the API when run for local manual testing. */
-export const localApiEnv = {
-  SPRING_PROFILES_ACTIVE: "local",
+/** API environment shared by local runs and E2E (Playwright, locally and in CI): the Admin bootstrap and the
+ *  web app's OAuth client. No Spring profile, so the local-only seed doesn't run in E2E. */
+export const testApiEnv = {
   WASHBASE_ADMIN_EMAIL: "admin@example.com",
   WASHBASE_ADMIN_MOBILE: "09171234567",
   WASHBASE_ADMIN_INITIAL_PASSWORD: LOCAL_PASSWORD,
   WASHBASE_WEB_CLIENT_SECRET: LOCAL_WEB_CLIENT_SECRET,
 };
+
+/** Environment for the API when run for local manual testing. */
+export const localApiEnv = {
+  SPRING_PROFILES_ACTIVE: "local",
+  ...testApiEnv,
+};
+
+/** Environment for the web app (the `washbase-web` OAuth client, ADR-001), for local runs and E2E.
+ *  `apiUrl` must be the URL scripts/api.mjs gives the API as its issuer (`WASHBASE_AUTH_ISSUER`), and `webUrl`
+ *  the web app's own URL, whose `/auth/callback` scripts/api.mjs registers as the redirect URI. */
+export function localWebEnv({ apiUrl, webUrl }) {
+  return {
+    API_BASE_URL: apiUrl,
+    AUTH_ISSUER: apiUrl,
+    AUTH_CLIENT_ID: "washbase-web",
+    AUTH_CLIENT_SECRET: LOCAL_WEB_CLIENT_SECRET,
+    AUTH_REDIRECT_URI: `${webUrl}/auth/callback`,
+    SESSION_SECRET: LOCAL_SESSION_SECRET,
+  };
+}
 
 /** This PC's address on the local network, so a phone running Expo Go can reach the API.
  *  Set LAN_IP to override. 192.168.x and 10.x are preferred over 172.16–31.x, which is also

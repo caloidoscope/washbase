@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { localWebEnv, testApiEnv } from "../../scripts/local-env.mjs";
 
 // Ports come from this checkout's `.washbase-instance` file, so the owner's folder and the agents'
 // worktree can run E2E at the same time. Keep the defaults in sync with scripts/instance.mjs.
@@ -23,8 +24,10 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   // Starts the API (needs Postgres: `docker compose up -d` locally, a service container in CI)
-  // and the web app. Locally, already-running servers are reused.
+  // and the web app. Locally, already-running servers are reused (e.g. this checkout's `pnpm dev:all`,
+  // which uses the same settings from scripts/local-env.mjs).
   // CI runs the web app from a production build; locally it uses `pnpm dev`.
+  // Every secret here is a publicly known local/test value (scripts/local-env.mjs): CI needs no GitHub secrets.
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : [
@@ -32,13 +35,16 @@ export default defineConfig({
           command: "node scripts/api.mjs serve",
           cwd: "../..",
           url: `${apiURL}/actuator/health`,
+          // The Admin bootstrap (admin@example.com / 09171234567) and the web app's OAuth client.
+          env: testApiEnv,
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,
         },
         {
           command: process.env.CI ? `pnpm start --port ${PORT}` : `pnpm dev --port ${PORT}`,
-          url: baseURL,
-          env: { API_BASE_URL: apiURL },
+          // Not `/`: it redirects to sign-in. The favicon is outside the proxy's matcher.
+          url: `${baseURL}/favicon.ico`,
+          env: localWebEnv({ apiUrl: apiURL, webUrl: `http://localhost:${PORT}` }),
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
         },
