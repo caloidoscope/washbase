@@ -26,9 +26,21 @@ if (run("git", ["status", "--porcelain"])) {
   process.exit(1);
 }
 
-const prs = JSON.parse(
-  run("gh", ["pr", "list", "--state", "open", "--json", "number,title,headRefName,isCrossRepository", "--limit", "100"]),
-).sort((a, b) => a.number - b.number);
+let prs;
+try {
+  prs = JSON.parse(
+    run("gh", ["pr", "list", "--state", "open", "--json", "number,title,headRefName,isCrossRepository", "--limit", "100"], {
+      stdio: "pipe",
+    }),
+  ).sort((a, b) => a.number - b.number);
+} catch {
+  console.error("Can't reach GitHub right now, so the list of open PRs isn't available.");
+  console.error("Branches already on this machine still work offline, e.g.:");
+  console.error("  git branch --list 'feat/*'              (see what you have)");
+  console.error("  git switch --detach <branch>            (test it; a stacked branch includes the PRs below it)");
+  console.error("Then: pnpm install && pnpm dev:all   When done: git switch main");
+  process.exit(1);
+}
 if (prs.length === 0) {
   console.log("No open pull requests. Nothing to combine.");
   process.exit(0);
