@@ -10,6 +10,9 @@ export const LOCAL_ACCOUNTS = [
   { role: "Client", email: "client@example.com" },
 ];
 export const LOCAL_PASSWORD = "Washbase-Local-1";
+/** Secret of the `washbase-web` OAuth client for local runs and tests. Publicly known, like LOCAL_PASSWORD:
+ *  never use it in a real deployment. */
+export const LOCAL_WEB_CLIENT_SECRET = "washbase-web-local-secret";
 
 /** Environment for the API when run for local manual testing. */
 export const localApiEnv = {
@@ -17,6 +20,7 @@ export const localApiEnv = {
   WASHBASE_ADMIN_EMAIL: "admin@example.com",
   WASHBASE_ADMIN_MOBILE: "09171234567",
   WASHBASE_ADMIN_INITIAL_PASSWORD: LOCAL_PASSWORD,
+  WASHBASE_WEB_CLIENT_SECRET: LOCAL_WEB_CLIENT_SECRET,
 };
 
 /** This PC's address on the local network, so a phone running Expo Go can reach the API.
