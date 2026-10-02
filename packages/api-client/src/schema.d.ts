@@ -3,10 +3,61 @@
  * Do not make direct changes to the file.
  */
 
-export type paths = Record<string, never>;
+export interface paths {
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who am I
+         * @description Returns the signed-in user, identified by the access token's `sub`. Roles: CLIENT, STAFF, OWNER, ADMIN.
+         */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        /** @description The signed-in user. */
+        MeResponse: {
+            /**
+             * Format: uuid
+             * @description User ID (the access token's `sub`).
+             */
+            id: string;
+            /**
+             * @description Display name.
+             * @example Admin
+             */
+            name: string;
+            /**
+             * Format: email
+             * @description Email address (lower-case), or null if the user signs in with a mobile number only.
+             * @example admin@example.com
+             */
+            email: string | null;
+            /**
+             * @description Philippine mobile number in +639XXXXXXXXX form, or null if none.
+             * @example +639171234567
+             */
+            mobile: string | null;
+            /**
+             * @description The user's role. Each user has exactly one.
+             * @enum {string}
+             */
+            role: "CLIENT" | "STAFF" | "OWNER" | "ADMIN";
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -14,4 +65,39 @@ export interface components {
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The signed-in user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description No valid access token (missing, expired, wrong issuer/audience/signature), or the token's user no longer exists or has been deactivated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The token carries none of the allowed roles. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+}

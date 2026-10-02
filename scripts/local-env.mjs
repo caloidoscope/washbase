@@ -15,6 +15,7 @@ export const LOCAL_PASSWORD = "Washbase-Local-1";
 export const localApiEnv = {
   SPRING_PROFILES_ACTIVE: "local",
   WASHBASE_ADMIN_EMAIL: "admin@example.com",
+  WASHBASE_ADMIN_MOBILE: "09171234567",
   WASHBASE_ADMIN_INITIAL_PASSWORD: LOCAL_PASSWORD,
 };
 
