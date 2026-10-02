@@ -2,7 +2,7 @@
 // one at a time. Same servers and settings as playwright.config.ts.
 import base from "./playwright.config";
 
-export default {
+const watchConfig = {
   ...base,
   workers: 1,
   retries: 0,
@@ -14,3 +14,5 @@ export default {
     viewport: { width: 1100, height: 750 },
   },
 };
+
+export default watchConfig;
