@@ -27,7 +27,9 @@ pnpm dev:all --lan      # terminal 1: also reachable from your Wi-Fi
 pnpm dev:mobile         # terminal 2: scan the QR code with Expo Go
 ```
 
-The phone and PC must be on the same Wi-Fi. If the app can't reach the API, rerun `pnpm dev:mobile` with `LAN_IP=<your PC's Wi-Fi address>`; on Windows, also allow Java through the firewall for private networks. Use `--lan` only on a network you trust (see test accounts below).
+The phone and PC must be on the same Wi-Fi. If the app can't reach the API, rerun **both** commands with `LAN_IP=<your PC's Wi-Fi address>` (sign-in only works when both use the same address); on Windows, also allow Java through the firewall for private networks. Use `--lan` only on a network you trust (see test accounts below).
+
+With `--lan`, sign-in goes through `http://<LAN-IP>:8080` for the web app on this PC too (one issuer for everyone, ADR-001 Amendment 2), and the API accepts Expo Go's sign-in redirect for this PC. If your PC's Wi-Fi address changes, restart both commands. `dev:mobile` keeps Expo on port 8081, which Expo Go's sign-in redirect needs: close any other Expo dev server first.
 
 ## Testing changes before they're merged
 

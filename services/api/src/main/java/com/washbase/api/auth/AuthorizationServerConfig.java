@@ -1,6 +1,11 @@
 package com.washbase.api.auth;
 
+import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
 import java.net.URI;
+import java.time.Clock;
+import java.util.HashMap;
 import java.util.Map;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -13,12 +18,23 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2Token;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.ExceptionMappingAuthenticationFailureHandler;
@@ -45,7 +61,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * CAR-19).</li>
  * </ol>
  * Only Authorization Code + PKCE (plus the refresh token grant it leads to) is possible: the registered clients
- * allow no other grant (see {@link RegisteredClients}). Refresh tokens are rotated on every use, and presenting a
+ * allow no other grant (see {@link RegisteredClients}). The public mobile client ({@code washbase-mobile}, CAR-20)
+ * proves nothing but its {@code client_id} when it renews or revokes: {@link PublicClientTokenAuthenticationConverter}
+ * and {@link PublicClientTokenAuthenticationProvider} allow exactly that, only for {@code grant_type=refresh_token}
+ * at the token endpoint and for the revocation endpoint, and only for clients registered with method {@code none};
+ * {@link #tokenGenerator} issues refresh tokens to it, which Spring Authorization Server doesn't by default. The
+ * code exchange still needs the PKCE {@code code_verifier}, and {@code washbase-web} still needs its secret
+ * everywhere. Refresh tokens are rotated on every use, and presenting a
  * replaced one ends the whole authorization ({@link RefreshTokenReuseDetectingAuthorizationService}). Signing out
  * revokes the refresh token, which also invalidates its access token; the resource server refuses an access token
  * that is no longer current at once ({@code com.washbase.api.config.SecurityConfig}).
@@ -71,13 +93,24 @@ class AuthorizationServerConfig {
 
 	@Bean
 	@Order(AUTHORIZATION_SERVER_CHAIN_ORDER)
-	SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+	SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
+			RegisteredClientRepository registeredClients, AuthorizationServerSettings settings,
+			OAuth2TokenGenerator<OAuth2Token> tokenGenerator) throws Exception {
 		http.oauth2AuthorizationServer(authorizationServer -> {
 			http.securityMatcher(authorizationServer.getEndpointsMatcher());
 			authorizationServer
 				// Ends the API's own sign-in session as soon as the code is issued (CAR-18).
 				.authorizationEndpoint(endpoint -> endpoint
 					.authorizationResponseHandler(new SessionEndingAuthorizationResponseHandler()))
+				// Public clients (washbase-mobile) renew and revoke with client_id alone (CAR-20). First, so they
+				// are tried before Spring's own; they decline (null) anything else.
+				.clientAuthentication(clients -> clients
+					.authenticationConverters(
+							converters -> converters.addFirst(new PublicClientTokenAuthenticationConverter(settings)))
+					.authenticationProviders(providers -> providers
+						.addFirst(new PublicClientTokenAuthenticationProvider(registeredClients))))
+				// Refresh tokens for public clients too (CAR-20): see tokenGenerator().
+				.tokenGenerator(tokenGenerator)
 				// Defaults include RP-initiated logout (/connect/logout) for any session still left.
 				.oidc(Customizer.withDefaults());
 		})
@@ -135,6 +168,58 @@ class AuthorizationServerConfig {
 		return new RefreshTokenReuseDetectingAuthorizationService(
 				new JdbcOAuth2AuthorizationService(jdbcOperations, registeredClientRepository), jdbcOperations,
 				new TransactionTemplate(transactionManager));
+	}
+
+	/**
+	 * The tokens the authorization server issues (CAR-20). The same as Spring Authorization Server's default except
+	 * for refresh tokens, which public clients get too ({@link PublicClientRefreshTokenGenerator}):
+	 * <ul>
+	 * <li>access tokens and ID tokens: signed JWTs ({@link JwtGenerator} with the signing key), access tokens with
+	 * the Washbase claims ({@link AccessTokenCustomizer}) and, as Spring's default, bound to a DPoP proof when the
+	 * client sent one ({@link #bindToDpopProof});</li>
+	 * <li>refresh tokens: opaque, for every client with the {@code refresh_token} grant.</li>
+	 * </ul>
+	 * No {@code OAuth2AccessTokenGenerator}: every client's access tokens are self-contained (JWT).
+	 */
+	@Bean
+	OAuth2TokenGenerator<OAuth2Token> tokenGenerator(JWKSource<SecurityContext> jwkSource,
+			AccessTokenCustomizer accessTokenCustomizer, Clock clock) {
+		JwtGenerator jwtGenerator = new JwtGenerator(new NimbusJwtEncoder(jwkSource));
+		jwtGenerator.setJwtCustomizer(context -> {
+			bindToDpopProof(context);
+			accessTokenCustomizer.customize(context);
+		});
+		return new DelegatingOAuth2TokenGenerator(jwtGenerator, new PublicClientRefreshTokenGenerator(clock));
+	}
+
+	/**
+	 * What Spring Authorization Server's default JWT customizer does for DPoP (RFC 9449 section 6.1), kept because
+	 * {@link #tokenGenerator} replaces the default generator: an access token requested with a verified DPoP proof
+	 * gets {@code cnf.jkt}, the SHA-256 thumbprint of the proof's public key. Washbase's clients send no DPoP proof
+	 * today, so this changes nothing for them.
+	 */
+	static void bindToDpopProof(JwtEncodingContext context) {
+		if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+			return;
+		}
+		Jwt proof = context.get(OAuth2TokenContext.DPOP_PROOF_KEY);
+		if (proof == null) {
+			return;
+		}
+		String thumbprint;
+		try {
+			@SuppressWarnings("unchecked")
+			Map<String, Object> jwk = (Map<String, Object>) proof.getHeaders().get("jwk");
+			thumbprint = JWK.parse(jwk).computeThumbprint().toString();
+		}
+		catch (Exception ex) {
+			throw new OAuth2AuthenticationException(new OAuth2Error("invalid_dpop_proof",
+					"jwk header is missing or invalid.", null), ex);
+		}
+		// A mutable map, as Spring's: the claims are stored as JSON and read back (see AccessTokenCustomizer).
+		Map<String, Object> confirmation = new HashMap<>();
+		confirmation.put("jkt", thumbprint);
+		context.getClaims().claim("cnf", confirmation);
 	}
 
 	/** Unused while first-party clients skip consent; kept so the JDBC tables match Spring Authorization Server. */

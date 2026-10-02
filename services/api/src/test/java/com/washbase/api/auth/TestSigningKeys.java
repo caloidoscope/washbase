@@ -39,7 +39,7 @@ final class TestSigningKeys {
 	static AuthProperties properties(String signingKey, boolean allowGenerated) {
 		return new AuthProperties("http://localhost:8080", "washbase-api", signingKey, allowGenerated,
 				new AuthProperties.WebClient("washbase-web", null, "http://localhost:3000/auth/callback"),
-				Duration.ofDays(30));
+				Duration.ofDays(30), AuthProperties.MobileClient.defaults());
 	}
 
 }

@@ -32,7 +32,12 @@ import org.springframework.web.util.UriComponentsBuilder;
  * ({@link #refresh}), sign-out ({@link #revoke}, {@link #logout}) as the web app's server does them (CAR-18). One
  * instance is one browser: it keeps its own session cookie and PKCE verifier.
  *
- * <p>Uses the client registered from {@code src/test/resources/config/application.properties}.
+ * <p>{@link #mobile} drives the mobile app's public client instead (CAR-20): the same sign-in through the in-app
+ * browser, redirected to {@value #MOBILE_REDIRECT_URI}, and every token request (code exchange, renewal,
+ * revocation) authenticated by {@code client_id} alone, with no secret.
+ *
+ * <p>Uses the clients registered from {@code src/main/resources/application.properties} and
+ * {@code src/test/resources/config/application.properties}.
  */
 public final class SignInFlow {
 
@@ -42,6 +47,11 @@ public final class SignInFlow {
 
 	public static final String REDIRECT_URI = "http://localhost:3000/auth/callback";
 
+	public static final String MOBILE_CLIENT_ID = "washbase-mobile";
+
+	/** The mobile app's own scheme (the default {@code washbase.auth.mobile-client.redirect-uris}). */
+	public static final String MOBILE_REDIRECT_URI = "washbase://auth/callback";
+
 	/** Exactly what the sign-in page shows for every failure. */
 	public static final String SIGN_IN_ERROR = "Incorrect email, mobile number or password.";
 
@@ -49,14 +59,37 @@ public final class SignInFlow {
 
 	private final MockMvc mockMvc;
 
+	private final String clientId;
+
+	/** {@code null} for the public mobile client: it authenticates with {@code client_id} alone. */
+	private final String clientSecret;
+
+	private final String redirectUri;
+
 	private final String codeVerifier = randomUrlSafe(32);
 
 	private final String state = randomUrlSafe(16);
 
 	private MockHttpSession session = new MockHttpSession();
 
+	/** The web app's sign-in ({@code washbase-web}, confidential, {@code client_secret_basic}). */
 	public SignInFlow(MockMvc mockMvc) {
+		this(mockMvc, CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+	}
+
+	private SignInFlow(MockMvc mockMvc, String clientId, String clientSecret, String redirectUri) {
 		this.mockMvc = mockMvc;
+		this.clientId = clientId;
+		this.clientSecret = clientSecret;
+		this.redirectUri = redirectUri;
+	}
+
+	/**
+	 * The mobile app's sign-in (CAR-20): {@code washbase-mobile}, a public client, redirected to
+	 * {@value #MOBILE_REDIRECT_URI}; the code exchange, renewal and revocation send {@code client_id} only.
+	 */
+	public static SignInFlow mobile(MockMvc mockMvc) {
+		return new SignInFlow(mockMvc, MOBILE_CLIENT_ID, null, MOBILE_REDIRECT_URI);
 	}
 
 	/**
@@ -82,21 +115,21 @@ public final class SignInFlow {
 
 		MockHttpServletResponse resumed = perform(get(URI.create(login.getRedirectedUrl())).accept(MediaType.TEXT_HTML));
 		String code = codeFrom(resumed);
-		MockHttpServletResponse token = tokenRequest(code, codeVerifier, CLIENT_SECRET);
+		MockHttpServletResponse token = tokenRequest(code, codeVerifier, clientSecret);
 		assertThat(token.getStatus()).as("token response: %s", token.getContentAsString()).isEqualTo(200);
 		return Tokens.from(token);
 	}
 
-	/** {@code GET /oauth2/authorize} with PKCE S256 for {@code washbase-web}, as a browser (HTML). */
+	/** {@code GET /oauth2/authorize} with PKCE S256 for this flow's client, as a browser (HTML). */
 	public MockHttpServletResponse authorize() throws Exception {
-		return perform(get(authorizeUri(REDIRECT_URI, true)).accept(MediaType.TEXT_HTML));
+		return perform(get(authorizeUri(redirectUri, true)).accept(MediaType.TEXT_HTML));
 	}
 
-	/** The authorization request the web app sends, optionally without PKCE or with another redirect URI. */
+	/** The authorization request the app sends, optionally without PKCE or with another redirect URI. */
 	public URI authorizeUri(String redirectUri, boolean withPkce) {
 		UriComponentsBuilder uri = UriComponentsBuilder.fromPath("/oauth2/authorize")
 			.queryParam("response_type", "code")
-			.queryParam("client_id", CLIENT_ID)
+			.queryParam("client_id", clientId)
 			.queryParam("scope", "openid")
 			.queryParam("redirect_uri", redirectUri)
 			.queryParam("state", state);
@@ -135,20 +168,22 @@ public final class SignInFlow {
 				&& session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY) != null;
 	}
 
-	/** {@code POST /oauth2/token} for a code, as the web app's server does. */
+	/** {@code POST /oauth2/token} for a code, as the app does. */
 	public String exchange(String code, String verifier, String clientSecret) throws Exception {
 		MockHttpServletResponse token = tokenRequest(code, verifier, clientSecret);
 		assertThat(token.getStatus()).as("token response: %s", token.getContentAsString()).isEqualTo(200);
 		return JsonPath.read(token.getContentAsString(), "$.access_token");
 	}
 
-	/** {@code POST /oauth2/token} ({@code authorization_code}); {@code verifier} may be {@code null}. */
+	/**
+	 * {@code POST /oauth2/token} ({@code authorization_code}); {@code verifier} may be {@code null}. With a
+	 * {@code clientSecret}: {@code client_secret_basic}; with {@code null}: {@code client_id} only (public client).
+	 */
 	public MockHttpServletResponse tokenRequest(String code, String verifier, String clientSecret) throws Exception {
-		var request = post("/oauth2/token").with(httpBasic(CLIENT_ID, clientSecret))
-			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+		var request = authenticated(post("/oauth2/token"), clientId, clientSecret)
 			.param("grant_type", "authorization_code")
 			.param("code", code)
-			.param("redirect_uri", REDIRECT_URI);
+			.param("redirect_uri", redirectUri);
 		if (verifier != null) {
 			request.param("code_verifier", verifier);
 		}
@@ -162,26 +197,45 @@ public final class SignInFlow {
 		return codeFrom(perform(get(URI.create(login.getRedirectedUrl())).accept(MediaType.TEXT_HTML)));
 	}
 
-	/** {@code POST /oauth2/token} ({@code refresh_token}, {@code client_secret_basic}), as the web app's server does. */
+	/**
+	 * {@code POST /oauth2/token} ({@code refresh_token}), as the web app's server ({@code client_secret_basic}) or the
+	 * mobile app ({@code client_id} only) does.
+	 */
 	public MockHttpServletResponse refresh(String refreshToken) throws Exception {
+		return refreshAs(clientId, clientSecret, refreshToken);
+	}
+
+	/** {@code POST /oauth2/token} ({@code refresh_token}) as any client; a {@code null} secret: {@code client_id} only. */
+	public MockHttpServletResponse refreshAs(String clientId, String clientSecret, String refreshToken)
+			throws Exception {
 		return mockMvc
-			.perform(post("/oauth2/token").with(httpBasic(CLIENT_ID, CLIENT_SECRET))
-				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
-				.param("grant_type", "refresh_token")
+			.perform(authenticated(post("/oauth2/token"), clientId, clientSecret).param("grant_type", "refresh_token")
 				.param("refresh_token", refreshToken))
 			.andReturn()
 			.getResponse();
 	}
 
-	/** {@code POST /oauth2/revoke} ({@code token_type_hint=refresh_token}), as the web app's sign-out does. */
+	/** {@code POST /oauth2/revoke} ({@code token_type_hint=refresh_token}), as the app's sign-out does. */
 	public MockHttpServletResponse revoke(String refreshToken) throws Exception {
+		return revokeAs(clientId, clientSecret, refreshToken);
+	}
+
+	/** {@code POST /oauth2/revoke} as any client; a {@code null} secret sends {@code client_id} only. */
+	public MockHttpServletResponse revokeAs(String clientId, String clientSecret, String refreshToken)
+			throws Exception {
 		return mockMvc
-			.perform(post("/oauth2/revoke").with(httpBasic(CLIENT_ID, CLIENT_SECRET))
-				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
-				.param("token", refreshToken)
+			.perform(authenticated(post("/oauth2/revoke"), clientId, clientSecret).param("token", refreshToken)
 				.param("token_type_hint", "refresh_token"))
 			.andReturn()
 			.getResponse();
+	}
+
+	/** A form POST with {@code client_secret_basic}, or with {@code client_id} only when there is no secret. */
+	private static MockHttpServletRequestBuilder authenticated(MockHttpServletRequestBuilder request, String clientId,
+			String clientSecret) {
+		request.contentType(MediaType.APPLICATION_FORM_URLENCODED);
+		return (clientSecret != null) ? request.with(httpBasic(clientId, clientSecret))
+				: request.param("client_id", clientId);
 	}
 
 	/** {@code GET /connect/logout} (OIDC RP-initiated logout) from this browser, as the web app's sign-out does. */
@@ -219,7 +273,7 @@ public final class SignInFlow {
 	private String codeFrom(MockHttpServletResponse response) {
 		assertThat(response.getStatus()).as("authorization response").isEqualTo(HttpStatus.FOUND.value());
 		String location = response.getHeader(HttpHeaders.LOCATION);
-		assertThat(location).as("redirect to the web app's callback").startsWith(REDIRECT_URI + "?");
+		assertThat(location).as("redirect to the app's callback").startsWith(redirectUri + "?");
 		UriComponents callback = UriComponentsBuilder.fromUriString(location).build();
 		assertThat(callback.getQueryParams().getFirst("state")).isEqualTo(state);
 		String code = callback.getQueryParams().getFirst("code");

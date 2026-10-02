@@ -1,6 +1,6 @@
 # ADR-001: Authentication and authorization (OAuth 2.1 / OIDC with JWT)
 
-- **Status:** Accepted (2026-10-02); amended 2026-10-02 by CAR-18 (see **Amendment 1**)
+- **Status:** Accepted (2026-10-02); amended 2026-10-02 by CAR-18 (see **Amendment 1**) and 2026-10-03 by CAR-20 (see **Amendment 2**)
 - **Implemented by:** the account Epics (CAR-5 and its split-offs). Their first Features build this foundation.
 
 ## Context
@@ -74,6 +74,17 @@ Decided with CAR-18 ("People stay signed in on the web app until they sign out")
 - **The authorization server's own sign-in session ends right after sign-in.** As soon as the authorization code is issued, the API invalidates its browser session. Clients keep their own session (the web app's encrypted `HttpOnly` cookie; secure storage on mobile), so every new authorization request asks for the password again. RP-initiated logout (`/connect/logout`) stays enabled for any session that is still left.
 - **Sign-out** (web): the web app's server revokes the refresh token (`POST /oauth2/revoke`), clears its session, then redirects through `/connect/logout` with `id_token_hint` and the registered `post_logout_redirect_uri` (the web app's home).
 - **Consequences:** every `/api` request costs one indexed database read; the cleanup of expired authorization and replaced-token rows is tracked with the production-readiness work (CAR-38). Several web app instances renewing the same refresh token concurrently would get one success and one `invalid_grant` (or trigger reuse detection if they don't overlap), signing the person out, so renewal is single-flight per process (noted for CAR-38). Sign-out while the API is unreachable clears the cookie but can't revoke the server-side authorization: the browser is signed out and shows "Can't reach Washbase right now. Try again.", but a copy of the cookie taken *before* sign-out could still be renewed until its refresh token expires (30 days without use) or is reused. This is an accepted risk (CAR-18 decision, 2026-10-02): refusing to sign out would be worse on a shared computer.
+
+## Amendment 2: The mobile app as a public client (CAR-20, 2026-10-03)
+
+Decided with CAR-20 ("People sign in, stay signed in and sign out on the mobile app").
+
+- **Client `washbase-mobile`:** public (authentication method `none`, no secret), Authorization Code + PKCE, grants `authorization_code` and `refresh_token`, scope `openid`, and the same token settings as `washbase-web` (15-minute JWT access tokens; opaque refresh tokens rotated on every use, with the reuse detection and single-winner renewal of Amendment 1). Always registered: there is nothing secret to configure.
+- **Refresh tokens for a public client.** Spring Authorization Server 7.1.1 issues none to public clients and can only authenticate a public client on the PKCE code exchange. Washbase adds both: a refresh-token generator that also serves public clients, and client authentication by `client_id` alone for exactly two requests, `grant_type=refresh_token` at `/oauth2/token` and `/oauth2/revoke`, only for clients registered with method `none`. OAuth 2.1 (section 4.3.1) allows this because the tokens are rotated. Spring's own checks still bind every token to its client, so one client's token can't be renewed or revoked as another client.
+- **Redirect URIs** come from configuration (`WASHBASE_MOBILE_REDIRECT_URIS`, default `washbase://auth/callback`, the scheme in `app.json`) and are matched exactly: no patterns, so no open redirect. Expo Go's form (`exp://<LAN-IP>:8081/--/auth/callback`) is refused at start-up unless `washbase.auth.mobile-client.allow-expo-go-redirect-uris=true`, which only the `local` profile sets.
+- **One issuer, also for a phone.** The issuer stays one configured URL, validated exactly; no per-request issuer (Spring Authorization Server can derive it from the request's `Host`, but then the resource server would have to trust several issuers chosen by a header). Production: the public `https` URL of the API. Local: `http://localhost:<port>`, and with `pnpm dev:all --lan` this PC's LAN URL (`http://<LAN-IP>:<port>`) for the API, the web app's `AUTH_ISSUER` and the phone's `EXPO_PUBLIC_AUTH_ISSUER` alike.
+- **Sign-out on mobile** revokes the refresh token (`/oauth2/revoke`, `token_type_hint=refresh_token`, `client_id`), which also ends its access token, and then clears secure storage. No end-session request is needed: the authorization server's browser session already ended when the code was issued (Amendment 1). Sign-out works the same while the API is unreachable as on the web (local tokens cleared; the accepted risk of Amendment 1 applies).
+- **Storage:** only the refresh token is persisted, in `expo-secure-store` (`AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, so it isn't restored to another device from a backup); the access token is kept in memory and renewed at start-up and shortly before it expires, single-flight within the app.
 
 ## Consequences
 - **CAR-5 comes first.** Its first Features set up the users table, both security filter chains, the login page and the token flows. Every later Feature builds on them.

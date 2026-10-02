@@ -49,6 +49,28 @@ export function localWebEnv({ apiUrl, webUrl }) {
   };
 }
 
+/** Port of Expo's dev server (Metro) for `pnpm dev:mobile`. Pinned, because Expo Go's sign-in redirect URI contains
+ *  it and the API only accepts registered redirect URIs exactly (CAR-20). */
+export const EXPO_GO_PORT = 8081;
+/** The mobile app's redirect path (`app.json` scheme `washbase` → `washbase://auth/callback`). */
+export const MOBILE_REDIRECT_PATH = "auth/callback";
+
+/** Settings for testing on a phone (`pnpm dev:all --lan` + `pnpm dev:mobile`, CAR-20). Tokens carry the issuer and
+ *  the phone discovers the authorization server from it, so in LAN mode the issuer is this PC's LAN URL, for the
+ *  API, the web app and the phone alike (one issuer, validated exactly as before). */
+export function lanAuthEnv({ ip, apiPort }) {
+  const issuer = `http://${ip}:${apiPort}`;
+  return {
+    issuer,
+    /** Redirect URIs of `washbase-mobile`: the app's own scheme, plus Expo Go's form for this PC. The API accepts
+     *  the exp:// one only in the `local` profile (washbase.auth.mobile-client.allow-expo-go-redirect-uris). */
+    mobileRedirectUris: [
+      `washbase://${MOBILE_REDIRECT_PATH}`,
+      `exp://${ip}:${EXPO_GO_PORT}/--/${MOBILE_REDIRECT_PATH}`,
+    ],
+  };
+}
+
 /** This PC's address on the local network, so a phone running Expo Go can reach the API.
  *  Set LAN_IP to override. 192.168.x and 10.x are preferred over 172.16–31.x, which is also
  *  used by Docker, WSL and Hyper-V virtual adapters. */
