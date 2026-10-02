@@ -1,56 +1,44 @@
-# Welcome to your Expo app 👋
+# Washbase mobile app
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo + Expo Router (`src/app/`). Routes live in `src/app/`; everything else (components, `src/lib/auth/`) lives outside it.
 
-## Get started
+## Run it on a phone (Expo Go)
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+From the repo root, in two terminals (see the root README, "On a phone"):
 
 ```bash
-npm run reset-project
+pnpm dev:all --lan   # Postgres + API reachable from your Wi-Fi, with sign-in issued at http://<LAN-IP>:8080
+pnpm dev:mobile      # Expo on port 8081, with EXPO_PUBLIC_API_BASE_URL and EXPO_PUBLIC_AUTH_ISSUER set to the LAN URL
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Scan the QR code with Expo Go. Sign in with `admin@example.com` (or `09171234567`) and `Washbase-Local-1`.
 
-### Other setup steps
+## Configuration
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+| Variable | Default | What |
+|---|---|---|
+| `EXPO_PUBLIC_API_BASE_URL` | `http://localhost:8080` | The API. A phone can't reach `localhost` on your PC: use its LAN IP (`pnpm dev:mobile` does). |
+| `EXPO_PUBLIC_AUTH_ISSUER` | the API base URL | The authorization server's issuer. It must equal the API's issuer exactly. |
 
-## Learn more
+## Sign-in (ADR-001 Amendment 2)
 
-To learn more about developing your project with Expo, look at the following resources:
+- Authorization Code + PKCE with the public client `washbase-mobile` (`expo-auth-session`), in the in-app browser.
+- Redirect URI: `exp://<LAN-IP>:8081/--/auth/callback` in Expo Go, `washbase://auth/callback` in development and
+  production builds. The API accepts only registered redirect URIs.
+- Only the refresh token is stored, in `expo-secure-store` (`washbase.refreshToken`, this device only). The access
+  token stays in memory. Nothing goes to AsyncStorage.
+- The session is renewed at start-up, when the app returns to the foreground, and when the access token is used within
+  60 seconds of its expiry. A refused renewal (e.g. after 30 days without use) shows the welcome screen. A network
+  error keeps the session and shows "Can't reach Washbase right now. Try again."
+- Sign-out clears secure storage, then revokes the refresh token.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Checks
 
-## Join the community
+```bash
+pnpm --filter @washbase/mobile lint
+pnpm --filter @washbase/mobile typecheck
+pnpm --filter @washbase/mobile test     # Jest (jest-expo); the root `pnpm test` runs it too
+npx expo-doctor                         # in apps/mobile
+```
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Add dependencies with `npx expo install <pkg>` (never `pnpm add`), and never edit `ios/` or `android/`.
