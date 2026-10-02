@@ -44,6 +44,8 @@ export function localWebEnv({ apiUrl, webUrl }) {
     AUTH_CLIENT_SECRET: LOCAL_WEB_CLIENT_SECRET,
     AUTH_REDIRECT_URI: `${webUrl}/auth/callback`,
     SESSION_SECRET: LOCAL_SESSION_SECRET,
+    // How long a web session lasts without use (CAR-18). Same as the API's default refresh-token lifetime (P30D).
+    SESSION_MAX_AGE_DAYS: "30",
   };
 }
 

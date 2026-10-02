@@ -10,7 +10,8 @@ export type Role = components["schemas"]["MeResponse"]["role"];
 export type CurrentUser =
   /** `GET /api/v1/me` answered 200. */
   | { status: "signed-in"; name: string; roleLabel: string }
-  /** No session, an expired one, or the API answered 401/403 for a session older than 30 seconds: sign in again. */
+  /** No session, one that has ended (SESSION_MAX_AGE_DAYS without use), or the API answered 401/403 for a session
+   *  older than 30 seconds: sign in again. */
   | { status: "signed-out" }
   /** The API answered 401/403 for a session created less than 30 seconds ago: a configuration fault. Show the
    *  "Sign-in didn't complete" state instead of redirecting, so the browser can't loop through sign-in. */
@@ -39,10 +40,14 @@ export function roleLabel(role: Role): string {
  * The signed-in user, via `@washbase/api-client` only: `createApiClient(authEnv().apiBaseUrl, { getAccessToken })`
  * with the token from `getSession()`, then `GET /api/v1/me`. Wrapped in React `cache` so one render calls the API
  * once.
+ *
+ * A session whose access token is still expired gets "unavailable" without calling the API: the proxy renews
+ * before every page, so a token that is still expired here means the renewal couldn't reach the API.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser> => {
   const session = await getSession();
   if (!session) return { status: "signed-out" };
+  if (session.expiresAt <= Date.now()) return { status: "unavailable" };
 
   const api = createApiClient(authEnv().apiBaseUrl, { getAccessToken: () => session.accessToken });
   let result;
