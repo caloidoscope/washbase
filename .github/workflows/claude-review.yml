@@ -3,6 +3,18 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
+    # A second, independent review only where mistakes are costly: authentication, security
+    # configuration, database migrations and design decisions. Every other PR gets senior-dev's
+    # review only (see CLAUDE.md → Workflow), which keeps token usage down.
+    paths:
+      - services/api/src/main/java/com/washbase/api/auth/**
+      - services/api/src/main/java/com/washbase/api/config/**
+      - services/api/src/main/resources/db/migration/**
+      - apps/web/src/lib/auth/**
+      - apps/web/src/app/auth/**
+      - apps/web/src/proxy.ts
+      - apps/mobile/src/lib/auth/**
+      - docs/architecture/**
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}

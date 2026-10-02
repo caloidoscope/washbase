@@ -110,6 +110,7 @@ The owner's folder is for the owner: they keep it on `main` and run `pnpm dev:al
 - Branch per PBI: `feat/<Linear ID>-<short-title>` (e.g. `feat/CAR-5-order-intake`) (or `fix/…`, `chore/…`).
 - Conventional Commits (`feat(api): …`, `fix(web): …`, `chore(ci): …`); scope = `api`, `web`, `mobile`, `api-client`, `ci`, `infra`.
 - Before opening a PR (`gh pr create`): `./mvnw verify` (if API touched), `pnpm lint && pnpm typecheck`, `pnpm test:e2e` (if web or API touched), `docker build services/api` (if API/Dockerfile touched), regenerated api-client (if contract touched). Link the Linear issue in the PR body.
+- **Verify once:** dev agents run only the tests they added or changed; senior-dev reviews the diff without re-running the full suite; `build-qa` runs the full checklist above once; CI repeats it as the final word.
 
 ## Workflow
 
@@ -136,6 +137,13 @@ Subagents can't start other subagents, so the main session (Lead Architect) runs
 4. **Gate 2:** the human moves the PBIs they approve to `Todo`.
 
 ### Building a PBI in `Todo` (one at a time, in `blockedBy` order)
+
+**Keep it lean** (token cost):
+- **Models:** `senior-dev` runs on Opus (plans, contracts, reviews); the other agents run on Sonnet (set in each agent's frontmatter).
+- **Splitting:** split a Feature into stacked PRs only when it's clearly large (more than ~1,500 changed lines) or mixes unrelated risk areas.
+- **Light path:** a Feature that touches a single area with **no API contract change** skips the separate `senior-dev` plan step. The dev agent works from the Feature directly, then `senior-dev` reviews.
+- **One review:** `senior-dev` reviews every PR. The CI Claude reviewer (`claude-review.yml`) runs only on security-sensitive paths: auth, security config, migrations, `docs/architecture`.
+- **Handoffs:** agent reports stay under ~200 words; plan comments are concise. The main session's prompts point to the plan comment instead of restating it, and it starts a **fresh session per Feature** (state lives in Linear, this file and memory).
 
 **Stacking:** a Feature doesn't wait for its prerequisites to be *merged*. If a `blockedBy` Feature has an open PR (not yet merged), the next Feature branches from that PR's branch and its PR targets that branch, so several Features can be in progress for the human to test together (`pnpm try:open-prs`). The human merges stacked PRs bottom-up. After a lower PR is squash-merged, `build-qa` rebases the next PR onto `main` (`git rebase --onto origin/main <old base> <branch>`, `git push --force-with-lease`, `gh pr edit <n> --base main`) and re-runs its checks.
 
