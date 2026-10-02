@@ -36,7 +36,7 @@ Embedded means one deployable per client deployment. The issuer URL is configura
 ### Tokens
 - **Access token:** a JWT signed with an asymmetric key (RS256), valid for **15 minutes**. Claims: `iss`, `sub` (user ID), `aud`, `exp`, `iat`, `roles` (`CLIENT` / `STAFF` / `OWNER` / `ADMIN`), and `scope`.
 - **Refresh token:** opaque, **rotated on every use**, revoked on sign-out, password change and deactivation. Lifetime 30 days (configurable).
-- **Signing keys:** supplied by environment or secret, never in the repo, and published via the JWKS endpoint so they can be rotated. Local development generates a key at startup.
+- **Signing keys:** supplied by environment or secret, never in the repo, and published via the JWKS endpoint so they can be rotated. The key comes from `WASHBASE_AUTH_SIGNING_KEY` (RSA private key, PKCS#8 PEM, at least 2048 bits). A key generated at start-up is allowed only when `washbase.auth.allow-generated-signing-key=true`, which is set only for local runs (the `local` profile), tests and `scripts/api.mjs`. Without it, a missing `WASHBASE_AUTH_SIGNING_KEY` stops start-up. Real deployments must set `WASHBASE_AUTH_SIGNING_KEY` and `WASHBASE_WEB_CLIENT_SECRET` (without the secret, the web app's client isn't registered and nobody can sign in on the web app).
 - **Deactivation:** refresh tokens are revoked immediately, and access tokens expire within 15 minutes. If immediate lock-out is ever required, add a per-request "user active" check.
 
 ### Protecting the API

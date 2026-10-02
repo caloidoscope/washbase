@@ -17,8 +17,13 @@ const apiEnv = {
   ...process.env,
   SERVER_PORT: process.env.SERVER_PORT ?? String(inst.apiPort),
   DATABASE_URL: process.env.DATABASE_URL ?? inst.databaseUrl,
-  // Read by the auth work (ADR-001): tokens must be issued for this checkout's own URL.
+  // Tokens must be issued for this checkout's own URL (ADR-001).
   WASHBASE_AUTH_ISSUER: process.env.WASHBASE_AUTH_ISSUER ?? apiUrl,
+  // This script only runs the API for local use, tests and CI: no signing-key secret there, so sign with a
+  // key generated at start-up. Real deployments don't use this script and fail fast without a key.
+  WASHBASE_AUTH_ALLOW_GENERATED_SIGNING_KEY: process.env.WASHBASE_AUTH_ALLOW_GENERATED_SIGNING_KEY ?? "true",
+  // The web app of this checkout (its port comes from .washbase-instance).
+  WASHBASE_WEB_REDIRECT_URI: process.env.WASHBASE_WEB_REDIRECT_URI ?? `${inst.webUrl}/auth/callback`,
 };
 
 /** Create this checkout's database if needed: only for the compose Postgres, i.e. when no

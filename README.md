@@ -81,6 +81,10 @@ Switching between PRs can leave tables from one PR's migrations in your local da
 | `pnpm db:reset` | Empty your local database (local test data only) |
 | `(cd services/api && ./mvnw verify)` | API unit and integration tests (needs Docker) |
 
+## Deploying
+
+A real deployment (anything not started with `pnpm dev:all`) must set two secrets, never committed to the repo: `WASHBASE_AUTH_SIGNING_KEY` (an RSA private key, e.g. from `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048`; without it the API refuses to start) and `WASHBASE_WEB_CLIENT_SECRET` (without it nobody can sign in on the web app). Details: [ADR-001](docs/architecture/adr-001-authentication.md).
+
 ## How work happens
 
 The AI agents work in their own copy of the repo (`../washbase-agents`, a git worktree) with their own ports and database, so your folder stays on `main` and your `pnpm dev:all` never clashes with them.
