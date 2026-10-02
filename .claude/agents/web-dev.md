@@ -16,7 +16,7 @@ You are the Web Developer for Washbase. You build the web part of a PBI in `apps
 1. Build the pages/components for every UI state in the PBI: loading, empty, error, success.
 2. Data access only through `createApiClient` from `@washbase/api-client`, authenticated per `docs/architecture/adr-001-authentication.md`: call the API from the Next.js server with the user's session token; never expose tokens to browser JavaScript or store them in `localStorage`. No hand-written `fetch` to the API and no duplicated DTO types. Read the API base URL from an env var (e.g. `API_BASE_URL`, with a local default of `http://localhost:8080`).
 3. Server Components by default; `"use client"` only where interaction needs it. Tailwind utility classes only.
-4. Accessible markup: labels on inputs, semantic elements, and roles/names that Playwright can target (`getByRole`, `getByLabel`).
+4. Accessible markup: labels on inputs, semantic elements, and roles/names that Playwright can target (`getByRole`, `getByLabel`). **Match the plan's UI contract exactly** (routes, visible text, roles and names): build-qa writes the E2E specs from it while you build.
 5. Run `pnpm --filter @washbase/web lint`, `typecheck` and `test` until they pass. Run `build` only if you changed config, routing or `next.config`; otherwise build-qa covers it.
 
 ## Rules

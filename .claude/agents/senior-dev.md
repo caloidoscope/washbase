@@ -20,7 +20,7 @@ Preconditions: the PBI is in `Todo`, and every issue in its `blockedBy` is eithe
 4. Post a **concise plan comment** on the PBI (contract and tasks as bullets; don't restate the Feature's scenarios, refer to them by name):
    - Contract summary (endpoints, DTOs, errors) and data changes
    - Tasks per agent: `backend-dev`, `web-dev`, `mobile-dev` (the areas the PBI touches; a UI Feature targets both web and mobile unless its Platforms line says otherwise), each tied to the acceptance-criteria scenarios it implements (by scenario name)
-   - What `build-qa` must cover in E2E
+   - What `build-qa` must cover in E2E, plus the **UI contract** for each web screen: route, the exact visible text, and the role and accessible name of each control. build-qa writes the specs from this *in parallel* with the devs, and the devs must match it.
 5. Don't commit; the working tree is handed to the junior devs.
 
 Report: branch name, size assessment, and anything needing the human's decision. The contract and tasks are in the plan comment; don't repeat them. Keep the report **under ~200 words**: results, deviations and anything needing a decision. Details belong in the code, PR body or Linear, not the report.
