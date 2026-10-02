@@ -97,4 +97,4 @@ A real deployment (anything not started with `pnpm dev:all`) must set two secret
 
 The AI agents work in their own copy of the repo (`../washbase-agents`, a git worktree) with their own ports and database, so your folder stays on `main` and your `pnpm dev:all` never clashes with them.
 
-Ideas become Epics and Features in Linear, which the owner approves (`Backlog` → `Todo`) before AI agents build them as pull requests. The owner tests and merges each one. Details: [CLAUDE.md](CLAUDE.md) (workflow, conventions, git/PR process), [`.claude/agents/`](.claude/agents/) (the agent roles), and [docs/architecture/](docs/architecture/) (design decisions).
+Ideas become Epics and Features in Linear, which the owner approves (`Backlog` → `Todo`) before AI agents build them as pull requests. Every PR is reviewed by the senior-dev agent; PRs touching sign-in/security code, migrations or architecture docs also get an automatic Claude review in CI. The owner tests and merges each one. Details: [CLAUDE.md](CLAUDE.md) (workflow, conventions, git/PR process), [`.claude/agents/`](.claude/agents/) (the agent roles), and [docs/architecture/](docs/architecture/) (design decisions).

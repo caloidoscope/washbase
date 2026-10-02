@@ -110,6 +110,7 @@ The owner's folder is for the owner: they keep it on `main` and run `pnpm dev:al
 - Branch per PBI: `feat/<Linear ID>-<short-title>` (e.g. `feat/CAR-5-order-intake`) (or `fix/…`, `chore/…`).
 - Conventional Commits (`feat(api): …`, `fix(web): …`, `chore(ci): …`); scope = `api`, `web`, `mobile`, `api-client`, `ci`, `infra`.
 - Before opening a PR (`gh pr create`): `./mvnw verify` (if API touched), `pnpm lint && pnpm typecheck`, `pnpm test:e2e` (if web or API touched), `docker build services/api` (if API/Dockerfile touched), regenerated api-client (if contract touched). Link the Linear issue in the PR body.
+- **Verify once:** dev agents run only the tests they added or changed; senior-dev reviews the diff without re-running the full suite; `build-qa` runs the full checklist above once; CI repeats it as the final word.
 
 ## Workflow
 
@@ -137,9 +138,16 @@ Subagents can't start other subagents, so the main session (Lead Architect) runs
 
 ### Building a PBI in `Todo` (one at a time, in `blockedBy` order)
 
+**Keep it lean** (token cost):
+- **Models:** `senior-dev` runs on Opus (plans, contracts, reviews); the other agents run on Sonnet (set in each agent's frontmatter).
+- **Splitting:** split a Feature into stacked PRs only when it's clearly large (more than ~1,500 changed lines) or mixes unrelated risk areas.
+- **Light path:** a Feature that touches a single area with **no API contract change** skips the separate `senior-dev` plan step. The dev agent works from the Feature directly, then `senior-dev` reviews.
+- **One review:** `senior-dev` reviews every PR. The CI Claude reviewer (`claude-review.yml`) runs only on security-sensitive paths: auth, security config, migrations, `docs/architecture`.
+- **Handoffs:** agent reports stay under ~200 words; plan comments are concise. The main session's prompts point to the plan comment instead of restating it, and it starts a **fresh session per Feature** (state lives in Linear, this file and memory).
+
 **Stacking:** a Feature doesn't wait for its prerequisites to be *merged*. If a `blockedBy` Feature has an open PR (not yet merged), the next Feature branches from that PR's branch and its PR targets that branch, so several Features can be in progress for the human to test together (`pnpm try:open-prs`). The human merges stacked PRs bottom-up. After a lower PR is squash-merged, `build-qa` rebases the next PR onto `main` (`git rebase --onto origin/main <old base> <branch>`, `git push --force-with-lease`, `gh pr edit <n> --base main`) and re-runs its checks.
 
-1. `senior-dev` (plan) → 2. `backend-dev` (if `api`) → 3. `web-dev` and/or `mobile-dev` (if `web`/`mobile`; may run in parallel) → 4. `senior-dev` (review; on `CHANGES REQUESTED`, send findings to the named agent and review again) → 5. `build-qa` (on a failed check it names the agent to fix it; loop) → 6. the human tests (see Manual testing) and merges → move the PBI to `Done`, and the Epic to `Done` when all its PBIs are; restack any PR that was based on the merged one.
+1. `senior-dev` (plan) → 2. **in parallel:** `backend-dev` (if `api`), `web-dev` and/or `mobile-dev` (if `web`/`mobile`), and `build-qa` in **"write tests early"** mode, which writes E2E specs from the scenarios and the plan's UI contract and touches only `apps/web/e2e/**` (when there's a new API contract, `backend-dev` goes first and the UI devs start once the contract is on the branch, as before) → 3. `senior-dev` (review; on `CHANGES REQUESTED`, send findings to the named agent and review again) → 4. `build-qa` in **"verify and ship"** mode (aligns the specs with the real UI, runs the full checklist once; on a failed check it names the agent to fix it; loop) → 5. the human tests (see Manual testing) and merges → move the PBI to `Done`, and the Epic to `Done` when all its PBIs are; restack any PR that was based on the merged one.
 
 ### "Check Linear"
 
