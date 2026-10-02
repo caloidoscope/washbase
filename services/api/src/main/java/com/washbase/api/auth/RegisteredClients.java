@@ -17,8 +17,9 @@ import org.springframework.security.oauth2.server.authorization.settings.OAuth2T
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 
 /**
- * The OAuth clients, built from configuration at start-up (read-only: {@code save} is unsupported). May be empty:
- * a deployment without {@code WASHBASE_WEB_CLIENT_SECRET} still starts, and nobody can sign in through the web app.
+ * The OAuth clients, built from configuration at start-up (read-only: {@code save} is unsupported). A deployment
+ * without {@code WASHBASE_WEB_CLIENT_SECRET} still starts with only the mobile client, and nobody can sign in through
+ * the web app.
  *
  * <p>{@code washbase-web} (when {@link AuthProperties.WebClient#isConfigured()}):
  * <ul>
@@ -40,12 +41,33 @@ import org.springframework.security.oauth2.server.authorization.settings.TokenSe
  * and the post-logout redirect URI</li>
  * </ul>
  * When the secret is unset, one WARN ({@value #WEB_CLIENT_MISSING_WARNING}) is logged. The secret is never logged.
+ *
+ * <p>{@code washbase-mobile} (CAR-20, ADR-001 Amendment 2), always registered: a <em>public</em> client.
+ * <ul>
+ * <li>{@code id} = {@code client_id} = {@link AuthProperties.MobileClient#clientId()}, client name
+ * {@value #MOBILE_CLIENT_NAME}</li>
+ * <li>no secret; authentication method {@code none} only (Spring Authorization Server then requires PKCE at the
+ * token endpoint)</li>
+ * <li>grant types {@code authorization_code} and {@code refresh_token}; no other grant</li>
+ * <li>redirect URIs {@link AuthProperties.MobileClient#redirectUris()}, each matched exactly; scope {@code openid};
+ * no post-logout redirect URI (sign-out on mobile is revocation only: the authorization server's browser session
+ * already ended when the code was issued)</li>
+ * <li>client settings and token settings: the same as {@code washbase-web} (PKCE required, no consent, 15-minute
+ * JWT access tokens, rotated opaque refresh tokens with reuse detection)</li>
+ * <li>Spring Authorization Server issues no refresh token to a public client and can't authenticate one at the
+ * refresh and revocation endpoints out of the box. {@link PublicClientRefreshTokenGenerator} and
+ * {@link PublicClientTokenAuthenticationConverter} / {@link PublicClientTokenAuthenticationProvider} add exactly that, for
+ * clients registered with method {@code none} and the {@code refresh_token} grant (OAuth 2.1 section 4.3.1: refresh
+ * tokens for public clients must be rotated, which they are)</li>
+ * </ul>
  */
 final class RegisteredClients implements RegisteredClientRepository {
 
 	static final Duration ACCESS_TOKEN_TIME_TO_LIVE = Duration.ofMinutes(15);
 
 	static final String WEB_CLIENT_NAME = "Washbase web app";
+
+	static final String MOBILE_CLIENT_NAME = "Washbase mobile app";
 
 	static final String WEB_CLIENT_MISSING_WARNING = "No web app client is configured (WASHBASE_WEB_CLIENT_SECRET); "
 			+ "sign-in on the web app is unavailable.";
@@ -67,7 +89,23 @@ final class RegisteredClients implements RegisteredClientRepository {
 		else {
 			log.warn(WEB_CLIENT_MISSING_WARNING);
 		}
+		clients.add(mobileClient(authProperties));
 		return new RegisteredClients(clients);
+	}
+
+	private static RegisteredClient mobileClient(AuthProperties authProperties) {
+		AuthProperties.MobileClient mobile = authProperties.mobileClient();
+		return RegisteredClient.withId(mobile.clientId())
+			.clientId(mobile.clientId())
+			.clientName(MOBILE_CLIENT_NAME)
+			.clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+			.authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+			.authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+			.redirectUris(uris -> uris.addAll(mobile.redirectUris()))
+			.scope(OidcScopes.OPENID)
+			.clientSettings(ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(false).build())
+			.tokenSettings(tokenSettings(authProperties))
+			.build();
 	}
 
 	private static RegisteredClient webClient(AuthProperties authProperties, PasswordEncoder passwordEncoder) {
@@ -83,13 +121,18 @@ final class RegisteredClients implements RegisteredClientRepository {
 			.postLogoutRedirectUri(AuthorizationServerConfig.webAppHome(authProperties))
 			.scope(OidcScopes.OPENID)
 			.clientSettings(ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(false).build())
-			.tokenSettings(TokenSettings.builder()
-				.accessTokenTimeToLive(ACCESS_TOKEN_TIME_TO_LIVE)
-				.accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
-				.idTokenSignatureAlgorithm(SignatureAlgorithm.RS256)
-				.refreshTokenTimeToLive(authProperties.refreshTokenTtl())
-				.reuseRefreshTokens(false)
-				.build())
+			.tokenSettings(tokenSettings(authProperties))
+			.build();
+	}
+
+	/** Token settings shared by every client: see the class Javadoc. */
+	private static TokenSettings tokenSettings(AuthProperties authProperties) {
+		return TokenSettings.builder()
+			.accessTokenTimeToLive(ACCESS_TOKEN_TIME_TO_LIVE)
+			.accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
+			.idTokenSignatureAlgorithm(SignatureAlgorithm.RS256)
+			.refreshTokenTimeToLive(authProperties.refreshTokenTtl())
+			.reuseRefreshTokens(false)
 			.build();
 	}
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,7 +56,7 @@ class RegisteredClientsTests {
 	void webClientRefreshTokensAndSignOut() {
 		AuthProperties settings = new AuthProperties("http://localhost:8080", "washbase-api", null, true,
 				new AuthProperties.WebClient("washbase-web", SECRET, "http://localhost:13000/auth/callback"),
-				Duration.ofDays(7));
+				Duration.ofDays(7), AuthProperties.MobileClient.defaults());
 
 		RegisteredClient web = RegisteredClients.fromConfiguration(settings, passwordEncoder)
 			.findByClientId("washbase-web");
@@ -67,13 +68,55 @@ class RegisteredClientsTests {
 	}
 
 	@Test
-	@DisplayName("No client is registered when the web client secret is unset, and one WARN is logged")
-	void noClientWithoutSecret(CapturedOutput output) {
+	@DisplayName("The web client isn't registered when its secret is unset (only the mobile client is), and one WARN is logged")
+	void noWebClientWithoutSecret(CapturedOutput output) {
 		RegisteredClients clients = RegisteredClients.fromConfiguration(settings(""), passwordEncoder);
 
 		assertThat(clients.findByClientId("washbase-web")).isNull();
 		assertThat(clients.findById("washbase-web")).isNull();
+		assertThat(clients.findByClientId("washbase-mobile")).isNotNull();
 		assertThat(output.getAll()).containsOnlyOnce(RegisteredClients.WEB_CLIENT_MISSING_WARNING).contains("WARN");
+	}
+
+	@Test
+	@DisplayName("washbase-mobile is registered as a public Authorization Code + PKCE client with the web app's token settings")
+	void mobileClientRegistered() {
+		RegisteredClients clients = RegisteredClients.fromConfiguration(settings(SECRET), passwordEncoder);
+
+		RegisteredClient mobile = clients.findByClientId("washbase-mobile");
+		RegisteredClient web = clients.findByClientId("washbase-web");
+		assertThat(mobile).isNotNull();
+		assertThat(clients.findById("washbase-mobile")).isSameAs(mobile);
+		assertThat(mobile.getClientName()).isEqualTo("Washbase mobile app");
+		assertThat(mobile.getClientSecret()).as("public: no secret").isNull();
+		assertThat(mobile.getClientAuthenticationMethods()).containsExactly(ClientAuthenticationMethod.NONE);
+		assertThat(mobile.getAuthorizationGrantTypes()).containsExactlyInAnyOrder(
+				AuthorizationGrantType.AUTHORIZATION_CODE, AuthorizationGrantType.REFRESH_TOKEN);
+		assertThat(mobile.getRedirectUris()).containsExactly("washbase://auth/callback");
+		assertThat(mobile.getPostLogoutRedirectUris()).isEmpty();
+		assertThat(mobile.getScopes()).containsExactly("openid");
+		assertThat(mobile.getClientSettings().isRequireProofKey()).isTrue();
+		assertThat(mobile.getClientSettings().isRequireAuthorizationConsent()).isFalse();
+		assertThat(mobile.getTokenSettings().getSettings()).isEqualTo(web.getTokenSettings().getSettings());
+		assertThat(mobile.getTokenSettings().getAccessTokenTimeToLive()).isEqualTo(Duration.ofMinutes(15));
+		assertThat(mobile.getTokenSettings().isReuseRefreshTokens()).as("rotated on every use").isFalse();
+		assertThat(mobile.getTokenSettings().getRefreshTokenTimeToLive()).isEqualTo(Duration.ofDays(30));
+	}
+
+	@Test
+	@DisplayName("washbase-mobile's redirect URIs and client ID come from configuration")
+	void mobileClientFromConfiguration() {
+		AuthProperties settings = new AuthProperties("http://localhost:8080", "washbase-api", null, true,
+				new AuthProperties.WebClient("washbase-web", SECRET, "http://localhost:13000/auth/callback"),
+				Duration.ofDays(30), new AuthProperties.MobileClient("washbase-mobile-test",
+						List.of("washbase://auth/callback", "exp://192.168.1.20:8081/--/auth/callback"), true));
+
+		RegisteredClient mobile = RegisteredClients.fromConfiguration(settings, passwordEncoder)
+			.findByClientId("washbase-mobile-test");
+
+		assertThat(mobile).isNotNull();
+		assertThat(mobile.getRedirectUris()).containsExactlyInAnyOrder("washbase://auth/callback",
+				"exp://192.168.1.20:8081/--/auth/callback");
 	}
 
 	@Test
@@ -95,7 +138,7 @@ class RegisteredClientsTests {
 	private static AuthProperties settings(String secret) {
 		return new AuthProperties("http://localhost:8080", "washbase-api", null, true,
 				new AuthProperties.WebClient("washbase-web", secret, "http://localhost:13000/auth/callback"),
-				Duration.ofDays(30));
+				Duration.ofDays(30), AuthProperties.MobileClient.defaults());
 	}
 
 }
