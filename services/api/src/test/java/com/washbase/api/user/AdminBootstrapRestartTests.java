@@ -105,8 +105,13 @@ class AdminBootstrapRestartTests {
 		assertThat(admin.isMustChangePassword()).isTrue();
 		assertThat(passwordEncoder.matches("Recover-2026", admin.getPasswordHash())).isTrue();
 
-		// The Admin signs in with the new initial password, as the same account.
-		String accessToken = new SignInFlow(mockMvc).signIn("admin@example.com", "Recover-2026");
+		// The Admin signs in with the new initial password, as the same account (CAR-21: after choosing a new one).
+		SignInFlow browser = new SignInFlow(mockMvc);
+		browser.authorize();
+		assertThat(browser.submitSignIn("admin@example.com", "Recover-2026").getRedirectedUrl())
+			.isEqualTo("/change-password");
+		String accessToken = browser.completeSignIn(browser.submitNewPassword("Blue-Basket-77", "Blue-Basket-77")
+			.getRedirectedUrl());
 		mockMvc.perform(get("/api/v1/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(adminId.toString()))

@@ -36,6 +36,7 @@ import org.springframework.security.oauth2.server.authorization.token.JwtGenerat
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.ExceptionMappingAuthenticationFailureHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
@@ -82,6 +83,9 @@ class AuthorizationServerConfig {
 
 	static final String LOGIN_PAGE = "/login";
 
+	/** "Choose a new password" (CAR-21): for signed-in people who must change their password. */
+	static final String CHANGE_PASSWORD_PAGE = "/change-password";
+
 	/** Where the sign-in page sends the browser after any failure; the page then shows the one generic message. */
 	static final String LOGIN_FAILURE_URL = LOGIN_PAGE + "?error";
 
@@ -95,6 +99,7 @@ class AuthorizationServerConfig {
 	@Order(AUTHORIZATION_SERVER_CHAIN_ORDER)
 	SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
 			RegisteredClientRepository registeredClients, AuthorizationServerSettings settings,
+			ChangePasswordService changePasswordService,
 			OAuth2TokenGenerator<OAuth2Token> tokenGenerator) throws Exception {
 		http.oauth2AuthorizationServer(authorizationServer -> {
 			http.securityMatcher(authorizationServer.getEndpointsMatcher());
@@ -115,6 +120,9 @@ class AuthorizationServerConfig {
 				.oidc(Customizer.withDefaults());
 		})
 			.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+			// Someone who must choose a new password is sent to the change-password page first (CAR-21).
+			.addFilterBefore(MustChangePasswordHandling.authorizationRequestFilter(changePasswordService),
+					AuthorizationFilter.class)
 			// Browsers (HTML) that aren't signed in go to the sign-in page; other callers get 401.
 			.exceptionHandling(exceptions -> exceptions.defaultAuthenticationEntryPointFor(
 					new LoginUrlAuthenticationEntryPoint(LOGIN_PAGE), new MediaTypeRequestMatcher(MediaType.TEXT_HTML)))
@@ -126,7 +134,8 @@ class AuthorizationServerConfig {
 	@Bean
 	@Order(LOGIN_CHAIN_ORDER)
 	SecurityFilterChain loginSecurityFilterChain(HttpSecurity http, AuthProperties authProperties,
-			UserAccountDetailsService userDetailsService, PasswordEncoder passwordEncoder, SignInAttempts attempts)
+			UserAccountDetailsService userDetailsService, PasswordEncoder passwordEncoder, SignInAttempts attempts,
+			ChangePasswordService changePasswordService)
 			throws Exception {
 		// Pause sign-in after repeated wrong passwords (CAR-19). The pausing provider is this chain's whole
 		// AuthenticationManager (no parent): falling back to the global one would check the password again and
@@ -134,14 +143,17 @@ class AuthorizationServerConfig {
 		DaoAuthenticationProvider passwords = new DaoAuthenticationProvider(userDetailsService);
 		passwords.setPasswordEncoder(passwordEncoder);
 		http.authenticationManager(new ProviderManager(new PausingAuthenticationProvider(passwords, attempts)));
-		http.securityMatcher(LOGIN_PAGE)
-			.authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+		http.securityMatcher(LOGIN_PAGE, CHANGE_PASSWORD_PAGE)
+			.authorizeHttpRequests(auth -> auth.requestMatchers(CHANGE_PASSWORD_PAGE)
+				.authenticated()
+				.anyRequest()
+				.permitAll())
 			// CSRF stays on (default): the template includes the token via th:action.
 			.formLogin(form -> form.loginPage(LOGIN_PAGE)
 				.failureHandler(loginFailureHandler())
 				// Normally the saved /oauth2/authorize request is resumed. Someone who opened /login directly is
 				// sent to the web app, which signs them in through the normal flow without asking again.
-				.defaultSuccessUrl(webAppHome(authProperties), false)
+				.successHandler(MustChangePasswordHandling.afterSignIn(changePasswordService, webAppHome(authProperties)))
 				.permitAll());
 		return http.build();
 	}

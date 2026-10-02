@@ -6,6 +6,7 @@ import os from "node:os";
  *  created by the local-only seed once the Features that introduce those roles exist. */
 export const LOCAL_ACCOUNTS = [
   { role: "Admin", email: "admin@example.com", mobile: "09171234567" },
+  { role: "Owner", email: "newowner@example.com", note: "must choose a new password at first sign-in (CAR-21)" },
   { role: "Owner", email: "owner@example.com" },
   { role: "Staff", email: "staff@example.com" },
   { role: "Client", email: "client@example.com" },
@@ -19,8 +20,11 @@ export const LOCAL_WEB_CLIENT_SECRET = "washbase-web-local-secret";
 export const LOCAL_SESSION_SECRET = "washbase-local-session-secret-not-for-production";
 
 /** API environment shared by local runs and E2E (Playwright, locally and in CI): the Admin bootstrap and the
- *  web app's OAuth client. No Spring profile, so the local-only seed doesn't run in E2E. */
+ *  web app's OAuth client. Profile `e2e` (not `local`), so the local-only seed doesn't run in E2E;
+ *  localApiEnv replaces it with `local`, so the unauthenticated /e2e hooks never run in manual testing. */
 export const testApiEnv = {
+  // Profile e2e: POST /e2e/accounts for the specs, and the bootstrapped Admin needs no password change (CAR-21).
+  SPRING_PROFILES_ACTIVE: "e2e",
   WASHBASE_ADMIN_EMAIL: "admin@example.com",
   WASHBASE_ADMIN_MOBILE: "09171234567",
   WASHBASE_ADMIN_INITIAL_PASSWORD: LOCAL_PASSWORD,
@@ -29,8 +33,8 @@ export const testApiEnv = {
 
 /** Environment for the API when run for local manual testing. */
 export const localApiEnv = {
-  SPRING_PROFILES_ACTIVE: "local",
   ...testApiEnv,
+  SPRING_PROFILES_ACTIVE: "local",
 };
 
 /** Environment for the web app (the `washbase-web` OAuth client, ADR-001), for local runs and E2E.
@@ -92,7 +96,8 @@ export function printAccounts() {
   console.log("\nTest accounts (local only):");
   for (const a of LOCAL_ACCOUNTS) {
     const signIn = a.mobile ? `${a.email} or ${a.mobile}` : a.email;
-    console.log(`  ${a.role.padEnd(7)} ${signIn.padEnd(36)} ${LOCAL_PASSWORD}`);
+    const note = a.note ? `  (${a.note})` : "";
+    console.log(`  ${a.role.padEnd(7)} ${signIn.padEnd(36)} ${LOCAL_PASSWORD}${note}`);
   }
   console.log("  (Each account exists once the Feature that adds it is built: the Admin with the sign-in");
   console.log("  foundation, CAR-17. The Admin may be asked to change the password at first sign-in.)\n");

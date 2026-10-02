@@ -42,7 +42,7 @@ class AdminBootstrapTests {
 
 	@BeforeEach
 	void setUp() {
-		bootstrap = new AdminBootstrap(users, passwordEncoder);
+		bootstrap = new AdminBootstrap(users, passwordEncoder, org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcOperations.class), true);
 		given(passwordEncoder.encode(anyString())).willReturn("{bcrypt}hash");
 		given(users.findByEmail(anyString())).willReturn(Optional.empty());
 		given(users.findByMobile(anyString())).willReturn(Optional.empty());

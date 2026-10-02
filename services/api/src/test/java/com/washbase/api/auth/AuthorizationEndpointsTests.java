@@ -57,7 +57,7 @@ class AuthorizationEndpointsTests {
 		jdbc.update("delete from sign_in_pause");
 		jdbc.update("delete from oauth2_authorization");
 		jdbc.update("delete from users");
-		AdminBootstrapping.startWith(context, "admin@example.com", null, PASSWORD);
+		AdminBootstrapping.startWithChosenPassword(context, "admin@example.com", null, PASSWORD);
 	}
 
 	@Test

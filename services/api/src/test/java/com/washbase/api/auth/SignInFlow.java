@@ -156,6 +156,27 @@ public final class SignInFlow {
 		return result.getResponse();
 	}
 
+	/** {@code POST /change-password} with a valid CSRF token, as the "Choose a new password" form does (CAR-21). */
+	public MockHttpServletResponse submitNewPassword(String newPassword, String confirmation) throws Exception {
+		return perform(post("/change-password").param("newPassword", newPassword)
+			.param("confirmPassword", confirmation)
+			.with(csrf())
+			.accept(MediaType.TEXT_HTML));
+	}
+
+	/** A page from this browser (same session), e.g. {@code /change-password} or a redirect target. */
+	public MockHttpServletResponse open(String location) throws Exception {
+		return perform(get(URI.create(absolute(location))).accept(MediaType.TEXT_HTML));
+	}
+
+	/** Follows the redirect that resumes the authorization request, then exchanges the code: the access token. */
+	public String completeSignIn(String resumeLocation) throws Exception {
+		String code = codeFrom(open(resumeLocation));
+		MockHttpServletResponse token = tokenRequest(code, codeVerifier, clientSecret);
+		assertThat(token.getStatus()).as("token response: %s", token.getContentAsString()).isEqualTo(200);
+		return JsonPath.read(token.getContentAsString(), "$.access_token");
+	}
+
 	/** The sign-in page as the browser sees it after a redirect to {@code location} (e.g. {@code /login?error}). */
 	public String page(String location) throws Exception {
 		return perform(get(URI.create(absolute(location))).accept(MediaType.TEXT_HTML))

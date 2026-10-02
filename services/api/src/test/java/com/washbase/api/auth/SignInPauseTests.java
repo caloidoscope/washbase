@@ -92,7 +92,7 @@ class SignInPauseTests {
 		jdbc.update("delete from users");
 		// The Admin account "admin@example.com" with password "Start-Here-2026" (and a mobile number, for the
 		// Scenario Outline's mobile row).
-		assertThat(AdminBootstrapping.startWith(context, ADMIN_EMAIL, "09171234567", PASSWORD)).isEqualTo("CREATED");
+		assertThat(AdminBootstrapping.startWithChosenPassword(context, ADMIN_EMAIL, "09171234567", PASSWORD)).isEqualTo("CREATED");
 		at("09:00");
 	}
 

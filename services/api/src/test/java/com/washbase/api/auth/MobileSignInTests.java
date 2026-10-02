@@ -81,7 +81,7 @@ class MobileSignInTests {
 		jdbc.update("delete from sign_in_pause");
 		jdbc.update("delete from oauth2_authorization");
 		jdbc.update("delete from users");
-		AdminBootstrapping.startWith(context, ADMIN_EMAIL, ADMIN_MOBILE, PASSWORD);
+		AdminBootstrapping.startWithChosenPassword(context, ADMIN_EMAIL, ADMIN_MOBILE, PASSWORD);
 	}
 
 	// ----- Scenarios -----

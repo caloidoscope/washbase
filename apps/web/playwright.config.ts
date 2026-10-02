@@ -22,7 +22,17 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    // CAR-21's spec swaps the one active Admin (the /e2e hooks deactivate admin@example.com while it runs), so it runs
+    // after every other spec has finished, in its own project.
+    { name: "chromium", testIgnore: /admin-first-sign-in\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "admin-first-sign-in",
+      testMatch: /admin-first-sign-in\.spec\.ts/,
+      dependencies: ["chromium"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
   // Starts the API (needs Postgres: `docker compose up -d` locally, a service container in CI)
   // and the web app. Locally, already-running servers are reused (e.g. this checkout's `pnpm dev:all`,
   // which uses the same settings from scripts/local-env.mjs).
