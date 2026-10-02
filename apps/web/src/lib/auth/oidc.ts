@@ -103,7 +103,7 @@ export class SignInFailedError extends Error {
 
 /** Maps any openid-client failure to one of our two errors, without carrying the original (its message or cause
  *  can quote the code, the token response or the request). */
-function toAuthError(error: unknown): AuthUnavailableError | SignInFailedError {
+export function toAuthError(error: unknown): AuthUnavailableError | SignInFailedError {
   if (error instanceof AuthUnavailableError || error instanceof SignInFailedError) return error;
   if (isUnreachable(error)) return new AuthUnavailableError();
   const name = error instanceof Error ? error.name : typeof error;
@@ -120,6 +120,8 @@ function isUnreachable(error: unknown): boolean {
   // fetch() failures are a plain TypeError ("fetch failed"); openid-client's own argument errors carry a `code`.
   if (error instanceof TypeError && !("code" in error)) return true;
   if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) return true;
+  // openid-client rethrows fetch's TimeoutError/AbortError as a ClientError with one of these codes.
+  if (error instanceof client.ClientError && (error.code === "OAUTH_TIMEOUT" || error.code === "OAUTH_ABORT")) return true;
   if (error instanceof client.ResponseBodyError) return error.status >= 500;
   if (error instanceof client.ClientError && error.cause instanceof Response) return error.cause.status >= 500;
   return false;

@@ -29,11 +29,16 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** {@code GET /api/v1/me} end to end through the resource server chain, against the real database. */
@@ -59,10 +64,17 @@ class MeControllerTests {
 	@Autowired
 	private AuthProperties authProperties;
 
+	@Autowired
+	private OAuth2AuthorizationService authorizationService;
+
+	@Autowired
+	private RegisteredClientRepository registeredClients;
+
 	private final Map<Role, UserAccount> userByRole = new EnumMap<>(Role.class);
 
 	@BeforeEach
 	void givenOneUserPerRole() {
+		jdbc.update("delete from oauth2_authorization");
 		jdbc.update("delete from users");
 		userByRole.put(Role.ADMIN,
 				users.save(new UserAccount("Admin", "admin@example.com", "+639171234567", "{noop}x", Role.ADMIN, true)));
@@ -162,6 +174,15 @@ class MeControllerTests {
 	}
 
 	@Test
+	@DisplayName("A correctly signed access token that the authorization server never issued is refused (401)")
+	void signedTokenNeverIssuedRefused() throws Exception {
+		String token = token(userByRole.get(Role.OWNER).getId().toString(), authProperties.issuer(),
+				authProperties.audience(), List.of("OWNER"), Instant.now().plus(15, ChronoUnit.MINUTES), false);
+		mockMvc.perform(get(ME).header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
 	@DisplayName("A signed access token for another audience, another issuer, or expired is refused (401)")
 	void signedTokenRejectedClaims() throws Exception {
 		String sub = userByRole.get(Role.OWNER).getId().toString();
@@ -176,6 +197,15 @@ class MeControllerTests {
 	}
 
 	private String token(String subject, String issuer, String audience, List<String> roles, Instant expiresAt) {
+		return token(subject, issuer, audience, roles, expiresAt, true);
+	}
+
+	/**
+	 * A signed access token. {@code issued}: also stored as the current access token of an authorization, as the
+	 * authorization server does, so that only the claims decide (the resource server refuses tokens it never issued).
+	 */
+	private String token(String subject, String issuer, String audience, List<String> roles, Instant expiresAt,
+			boolean issued) {
 		Instant issuedAt = expiresAt.minus(15, ChronoUnit.MINUTES);
 		JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
 			.issuer(issuer)
@@ -188,8 +218,17 @@ class MeControllerTests {
 			claims.claim("roles", roles);
 		}
 		JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).type("JWT").build();
-		return new NimbusJwtEncoder(jwkSource).encode(JwtEncoderParameters.from(header, claims.build()))
+		String token = new NimbusJwtEncoder(jwkSource).encode(JwtEncoderParameters.from(header, claims.build()))
 			.getTokenValue();
+		if (issued) {
+			authorizationService.save(OAuth2Authorization
+				.withRegisteredClient(registeredClients.findByClientId("washbase-web"))
+				.principalName(subject)
+				.authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+				.accessToken(new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, token, issuedAt, expiresAt))
+				.build());
+		}
+		return token;
 	}
 
 }

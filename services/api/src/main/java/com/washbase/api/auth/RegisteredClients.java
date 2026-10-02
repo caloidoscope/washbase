@@ -26,10 +26,18 @@ import org.springframework.security.oauth2.server.authorization.settings.TokenSe
  * authorizations reference it), client name {@value #WEB_CLIENT_NAME}</li>
  * <li>client secret {@code passwordEncoder.encode(secret)}; authentication method {@code client_secret_basic}
  * only</li>
- * <li>grant type {@code authorization_code} only (refresh tokens come with CAR-18)</li>
+ * <li>grant types {@code authorization_code} and {@code refresh_token} (CAR-18); no other grant</li>
  * <li>redirect URI {@link AuthProperties.WebClient#redirectUri()} only; scope {@code openid}</li>
+ * <li>post-logout redirect URI: the web app's home ({@link AuthorizationServerConfig#webAppHome}, e.g.
+ * {@code http://localhost:3000/}) only, for OIDC RP-initiated logout ({@code /connect/logout})</li>
  * <li>client settings: {@code requireProofKey(true)}, {@code requireAuthorizationConsent(false)}</li>
- * <li>token settings: access token {@link #ACCESS_TOKEN_TIME_TO_LIVE}, {@code SELF_CONTAINED} (JWT), RS256</li>
+ * <li>token settings: access token {@link #ACCESS_TOKEN_TIME_TO_LIVE}, {@code SELF_CONTAINED} (JWT), RS256; refresh
+ * token opaque, lifetime {@link AuthProperties#refreshTokenTtl()}, {@code reuseRefreshTokens(false)} (a new refresh
+ * token on every use; presenting a replaced one ends the whole authorization, see
+ * {@code RefreshTokenReuseDetectingAuthorizationService})</li>
+ * <li>sign-out: the client revokes its refresh token at {@code /oauth2/revoke} ({@code client_secret_basic}; this
+ * also invalidates the access token), then sends the browser to {@code /connect/logout} with {@code id_token_hint}
+ * and the post-logout redirect URI</li>
  * </ul>
  * When the secret is unset, one WARN ({@value #WEB_CLIENT_MISSING_WARNING}) is logged. The secret is never logged.
  */
@@ -54,7 +62,7 @@ final class RegisteredClients implements RegisteredClientRepository {
 		List<RegisteredClient> clients = new ArrayList<>();
 		AuthProperties.WebClient web = authProperties.webClient();
 		if (web.isConfigured()) {
-			clients.add(webClient(web, passwordEncoder));
+			clients.add(webClient(authProperties, passwordEncoder));
 		}
 		else {
 			log.warn(WEB_CLIENT_MISSING_WARNING);
@@ -62,20 +70,25 @@ final class RegisteredClients implements RegisteredClientRepository {
 		return new RegisteredClients(clients);
 	}
 
-	private static RegisteredClient webClient(AuthProperties.WebClient web, PasswordEncoder passwordEncoder) {
+	private static RegisteredClient webClient(AuthProperties authProperties, PasswordEncoder passwordEncoder) {
+		AuthProperties.WebClient web = authProperties.webClient();
 		return RegisteredClient.withId(web.clientId())
 			.clientId(web.clientId())
 			.clientName(WEB_CLIENT_NAME)
 			.clientSecret(passwordEncoder.encode(web.secret()))
 			.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
 			.authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+			.authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
 			.redirectUri(web.redirectUri())
+			.postLogoutRedirectUri(AuthorizationServerConfig.webAppHome(authProperties))
 			.scope(OidcScopes.OPENID)
 			.clientSettings(ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(false).build())
 			.tokenSettings(TokenSettings.builder()
 				.accessTokenTimeToLive(ACCESS_TOKEN_TIME_TO_LIVE)
 				.accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
 				.idTokenSignatureAlgorithm(SignatureAlgorithm.RS256)
+				.refreshTokenTimeToLive(authProperties.refreshTokenTtl())
+				.reuseRefreshTokens(false)
 				.build())
 			.build();
 	}

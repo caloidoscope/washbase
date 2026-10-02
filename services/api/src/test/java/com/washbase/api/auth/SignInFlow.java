@@ -21,14 +21,16 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Drives the web app's sign-in through the embedded authorization server with MockMvc, the way the Next.js
  * backend-for-frontend will: {@code /oauth2/authorize} (PKCE S256) → {@code /login} (form, CSRF) → {@code code} on
- * the redirect URI → {@code /oauth2/token} ({@code client_secret_basic}) → access token. One instance is one
- * browser: it keeps its own session cookie and PKCE verifier.
+ * the redirect URI → {@code /oauth2/token} ({@code client_secret_basic}) → access token. Also renewal
+ * ({@link #refresh}), sign-out ({@link #revoke}, {@link #logout}) as the web app's server does them (CAR-18). One
+ * instance is one browser: it keeps its own session cookie and PKCE verifier.
  *
  * <p>Uses the client registered from {@code src/test/resources/config/application.properties}.
  */
@@ -62,6 +64,14 @@ public final class SignInFlow {
 	 * @return the access token
 	 */
 	public String signIn(String emailOrMobile, String password) throws Exception {
+		return signInForTokens(emailOrMobile, password).accessToken();
+	}
+
+	/**
+	 * The whole flow for someone who signs in successfully.
+	 * @return the access, refresh and ID tokens from the token response
+	 */
+	public Tokens signInForTokens(String emailOrMobile, String password) throws Exception {
 		MockHttpServletResponse authorize = authorize();
 		assertThat(authorize.getStatus()).as("unauthenticated /oauth2/authorize").isEqualTo(HttpStatus.FOUND.value());
 		assertThat(authorize.getRedirectedUrl()).as("sent to the sign-in page").endsWith("/login");
@@ -70,17 +80,16 @@ public final class SignInFlow {
 		assertThat(login.getRedirectedUrl()).as("signed in and sent back to /oauth2/authorize")
 			.contains("/oauth2/authorize");
 
-		MockHttpServletResponse resumed = mockMvc.perform(get(URI.create(login.getRedirectedUrl())).session(session)
-			.accept(MediaType.TEXT_HTML)).andReturn().getResponse();
+		MockHttpServletResponse resumed = perform(get(URI.create(login.getRedirectedUrl())).accept(MediaType.TEXT_HTML));
 		String code = codeFrom(resumed);
-		return exchange(code, codeVerifier, CLIENT_SECRET);
+		MockHttpServletResponse token = tokenRequest(code, codeVerifier, CLIENT_SECRET);
+		assertThat(token.getStatus()).as("token response: %s", token.getContentAsString()).isEqualTo(200);
+		return Tokens.from(token);
 	}
 
 	/** {@code GET /oauth2/authorize} with PKCE S256 for {@code washbase-web}, as a browser (HTML). */
 	public MockHttpServletResponse authorize() throws Exception {
-		return mockMvc.perform(get(authorizeUri(REDIRECT_URI, true)).session(session).accept(MediaType.TEXT_HTML))
-			.andReturn()
-			.getResponse();
+		return perform(get(authorizeUri(REDIRECT_URI, true)).accept(MediaType.TEXT_HTML));
 	}
 
 	/** The authorization request the web app sends, optionally without PKCE or with another redirect URI. */
@@ -99,13 +108,15 @@ public final class SignInFlow {
 
 	/** {@code POST /login} with a valid CSRF token, as the sign-in page's form does. */
 	public MockHttpServletResponse submitSignIn(String emailOrMobile, String password) throws Exception {
-		MvcResult result = mockMvc
-			.perform(post("/login").session(session)
-				.param("username", emailOrMobile)
-				.param("password", password)
-				.with(csrf()))
-			.andReturn();
-		// Signing in may give the browser a new session; keep following it like a cookie jar would.
+		return perform(post("/login").param("username", emailOrMobile).param("password", password).with(csrf()));
+	}
+
+	/**
+	 * One request from this browser. A request may give the browser a new session (sign-in, or a new one after the
+	 * old one ended); keep following it like a cookie jar would.
+	 */
+	private MockHttpServletResponse perform(MockHttpServletRequestBuilder request) throws Exception {
+		MvcResult result = mockMvc.perform(request.session(session)).andReturn();
 		if (result.getRequest().getSession(false) instanceof MockHttpSession current) {
 			session = current;
 		}
@@ -114,15 +125,14 @@ public final class SignInFlow {
 
 	/** The sign-in page as the browser sees it after a redirect to {@code location} (e.g. {@code /login?error}). */
 	public String page(String location) throws Exception {
-		return mockMvc.perform(get(URI.create(absolute(location))).session(session).accept(MediaType.TEXT_HTML))
-			.andReturn()
-			.getResponse()
+		return perform(get(URI.create(absolute(location))).accept(MediaType.TEXT_HTML))
 			.getContentAsString(StandardCharsets.UTF_8);
 	}
 
 	/** Whether this browser's session holds a signed-in user. */
 	public boolean isSignedIn() {
-		return session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY) != null;
+		return !session.isInvalid()
+				&& session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY) != null;
 	}
 
 	/** {@code POST /oauth2/token} for a code, as the web app's server does. */
@@ -149,10 +159,57 @@ public final class SignInFlow {
 	public String authorizationCode(String emailOrMobile, String password) throws Exception {
 		authorize();
 		MockHttpServletResponse login = submitSignIn(emailOrMobile, password);
-		return codeFrom(mockMvc
-			.perform(get(URI.create(login.getRedirectedUrl())).session(session).accept(MediaType.TEXT_HTML))
+		return codeFrom(perform(get(URI.create(login.getRedirectedUrl())).accept(MediaType.TEXT_HTML)));
+	}
+
+	/** {@code POST /oauth2/token} ({@code refresh_token}, {@code client_secret_basic}), as the web app's server does. */
+	public MockHttpServletResponse refresh(String refreshToken) throws Exception {
+		return mockMvc
+			.perform(post("/oauth2/token").with(httpBasic(CLIENT_ID, CLIENT_SECRET))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("grant_type", "refresh_token")
+				.param("refresh_token", refreshToken))
 			.andReturn()
-			.getResponse());
+			.getResponse();
+	}
+
+	/** {@code POST /oauth2/revoke} ({@code token_type_hint=refresh_token}), as the web app's sign-out does. */
+	public MockHttpServletResponse revoke(String refreshToken) throws Exception {
+		return mockMvc
+			.perform(post("/oauth2/revoke").with(httpBasic(CLIENT_ID, CLIENT_SECRET))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("token", refreshToken)
+				.param("token_type_hint", "refresh_token"))
+			.andReturn()
+			.getResponse();
+	}
+
+	/** {@code GET /connect/logout} (OIDC RP-initiated logout) from this browser, as the web app's sign-out does. */
+	public MockHttpServletResponse logout(String idToken, String postLogoutRedirectUri) throws Exception {
+		// In the query string, as a browser redirect sends them (the endpoint reads GET parameters from there).
+		URI uri = URI.create("http://localhost" + UriComponentsBuilder.fromPath("/connect/logout")
+			.queryParam("id_token_hint", idToken)
+			.queryParam("post_logout_redirect_uri", postLogoutRedirectUri)
+			.encode()
+			.build()
+			.toUriString());
+		return perform(get(uri).accept(MediaType.TEXT_HTML));
+	}
+
+	/** The tokens from a successful token response. */
+	public record Tokens(String accessToken, String refreshToken, String idToken) {
+
+		public static Tokens from(MockHttpServletResponse tokenResponse) throws Exception {
+			String body = tokenResponse.getContentAsString();
+			return new Tokens(JsonPath.read(body, "$.access_token"), JsonPath.read(body, "$.refresh_token"),
+					JsonPath.read(body, "$.id_token"));
+		}
+
+		@Override
+		public String toString() {
+			return "Tokens[******]";
+		}
+
 	}
 
 	public String codeVerifier() {

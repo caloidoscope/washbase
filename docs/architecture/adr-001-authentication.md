@@ -1,6 +1,6 @@
 # ADR-001: Authentication and authorization (OAuth 2.1 / OIDC with JWT)
 
-- **Status:** Accepted (2026-10-02)
+- **Status:** Accepted (2026-10-02); amended 2026-10-02 by CAR-18 (see **Amendment 1**)
 - **Implemented by:** the account Epics (CAR-5 and its split-offs). Their first Features build this foundation.
 
 ## Context
@@ -35,12 +35,12 @@ Embedded means one deployable per client deployment. The issuer URL is configura
 
 ### Tokens
 - **Access token:** a JWT signed with an asymmetric key (RS256), valid for **15 minutes**. Claims: `iss`, `sub` (user ID), `aud`, `exp`, `iat`, `roles` (`CLIENT` / `STAFF` / `OWNER` / `ADMIN`), and `scope`.
-- **Refresh token:** opaque, **rotated on every use**, revoked on sign-out, password change and deactivation. Lifetime 30 days (configurable).
+- **Refresh token:** opaque, **rotated on every use**, revoked on sign-out, password change and deactivation. Lifetime 30 days (configurable, `washbase.auth.refresh-token-ttl`); each renewal issues a new one with the full lifetime, so a sign-in lasts until sign-out or 30 days without use. **Reuse detection:** presenting an already-replaced refresh token ends the whole authorization (see Amendment 1).
 - **Signing keys:** supplied by environment or secret, never in the repo, and published via the JWKS endpoint so they can be rotated. The key comes from `WASHBASE_AUTH_SIGNING_KEY` (RSA private key, PKCS#8 PEM, at least 2048 bits). A key generated at start-up is allowed only when `washbase.auth.allow-generated-signing-key=true`, which is set only for local runs (the `local` profile), tests and `scripts/api.mjs`. Without it, a missing `WASHBASE_AUTH_SIGNING_KEY` stops start-up. Real deployments must set `WASHBASE_AUTH_SIGNING_KEY` and `WASHBASE_WEB_CLIENT_SECRET` (without the secret, the web app's client isn't registered and nobody can sign in on the web app).
-- **Deactivation:** refresh tokens are revoked immediately, and access tokens expire within 15 minutes. If immediate lock-out is ever required, add a per-request "user active" check.
+- **Deactivation:** refresh tokens are revoked immediately, and access tokens stop working at once too (Amendment 1: an access token is accepted only while its authorization is active).
 
 ### Protecting the API
-- **Default deny:** every `/api/**` endpoint requires a valid JWT. Signature, `iss`, `aud` and `exp` are all checked.
+- **Default deny:** every `/api/**` endpoint requires a valid JWT. Signature, `iss`, `aud` and `exp` are all checked, and the token must be the current access token of an authorization that hasn't been revoked (Amendment 1).
 - **Public endpoints are an explicit allowlist** in one place: `/actuator/health`, the OAuth/OIDC endpoints, the login, registration and password-reset pages, and `/v3/api-docs` and Swagger UI. The docs endpoints are controlled by one property, `washbase.security.public-api-docs`, which defaults to **`true`** and is set to `false` only in production configuration. Local runs, `pnpm api:client` (`scripts/api.mjs`) and the CI `contract` job fetch `/v3/api-docs` without a token and must keep working. A Feature that needs another public endpoint must say so in its Technical Notes.
 - **Role checks:** a `roles` claim maps to authorities, checked with `@PreAuthorize` on the controller method. **Roles are independent, not a hierarchy:** each user has exactly one role (the token's `roles` claim is an array for standards compatibility but always holds one value; don't build multi-role handling), and `OWNER` does not imply `STAFF`. An endpoint lists every role it allows, e.g. `@PreAuthorize("hasAnyRole('STAFF','OWNER','ADMIN')")`. **Rule:** every endpoint that allows `OWNER` also lists `ADMIN` (the Admin can do everything an Owner can); Admin-only endpoints (managing Owners, the Admin action log) list only `ADMIN`. This keeps the rule visible in code and testable, so each Feature states exactly who may call it and the `403` tests cover every other role.
 - **Ownership checks**, such as a Client seeing only their own orders, happen in the service layer using `sub`, never a user ID taken from the request.
@@ -62,6 +62,16 @@ Embedded means one deployable per client deployment. The issuer URL is configura
 ### Testing
 - **Every protected endpoint has tests** for: no token → `401`, wrong role → `403`, allowed role → success. Use Spring Security's `jwt()` MockMvc post-processor.
 - **E2E:** a test helper creates a user through the API and signs in programmatically, so specs don't click through the login page except in the sign-in Feature's own tests.
+
+## Amendment 1: Sign-out, renewal and revocation take effect at once (CAR-18, 2026-10-02)
+
+Decided with CAR-18 ("People stay signed in on the web app until they sign out"). Without these, a copied session would keep working for up to 15 minutes after sign-out, and a still-open sign-in session at the authorization server would sign someone straight back in after sign-out or reuse detection.
+
+- **Access tokens are refused immediately** after sign-out (refresh-token revocation), any other revocation, a renewal that replaced them, or refresh-token reuse detection. The resource server (`/api/**` and `/userinfo`) accepts a JWT only if, besides signature and claims, it is the **current** access token of a non-revoked authorization in `oauth2_authorization`. This is one indexed lookup per request (hash index on `access_token_value`); the answer otherwise is `401 invalid_token`. It replaces "access tokens expire within 15 minutes" wherever this ADR said so, and gives deactivation immediate lock-out once deactivation revokes the person's authorizations.
+- **Refresh tokens are rotated on every use, with reuse detection.** Every replaced refresh token is remembered only as a SHA-256 hash (`oauth2_replaced_refresh_token`) until its own expiry. Presenting a replaced token again, to the token endpoint or the revocation endpoint (with the `refresh_token` hint or none), removes the whole authorization: the current refresh and access tokens stop working and the person must sign in again. A replaced token presented after its own expiry is simply refused. **Only one renewal per refresh token can win:** saving a renewal locks the authorization's row and is refused (`invalid_grant`) if the stored refresh token is no longer the one presented, so two simultaneous renewals never both succeed. Token values are never stored outside `oauth2_authorization` and never logged.
+- **The authorization server's own sign-in session ends right after sign-in.** As soon as the authorization code is issued, the API invalidates its browser session. Clients keep their own session (the web app's encrypted `HttpOnly` cookie; secure storage on mobile), so every new authorization request asks for the password again. RP-initiated logout (`/connect/logout`) stays enabled for any session that is still left.
+- **Sign-out** (web): the web app's server revokes the refresh token (`POST /oauth2/revoke`), clears its session, then redirects through `/connect/logout` with `id_token_hint` and the registered `post_logout_redirect_uri` (the web app's home).
+- **Consequences:** every `/api` request costs one indexed database read; the cleanup of expired authorization and replaced-token rows is tracked with the production-readiness work (CAR-38). Several web app instances renewing the same refresh token concurrently would get one success and one `invalid_grant` (or trigger reuse detection if they don't overlap), signing the person out, so renewal is single-flight per process (noted for CAR-38).
 
 ## Consequences
 - **CAR-5 comes first.** Its first Features set up the users table, both security filter chains, the login page and the token flows. Every later Feature builds on them.

@@ -44,6 +44,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - name: Unit tests (web, Vitest)
+        run: pnpm test
 
   e2e:
     name: Playwright E2E (web + API)

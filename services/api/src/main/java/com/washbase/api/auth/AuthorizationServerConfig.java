@@ -19,6 +19,8 @@ import org.springframework.security.oauth2.server.authorization.settings.Authori
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The embedded authorization server (ADR-001): Spring Authorization Server with OIDC, and the sign-in page.
@@ -27,14 +29,20 @@ import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
  * {@code com.washbase.api.config.SecurityConfig} is order 3 and takes everything else):
  * <ol>
  * <li>{@link #authorizationServerSecurityFilterChain}: only the OAuth/OIDC endpoints ({@code /oauth2/authorize},
- * {@code /oauth2/token}, {@code /oauth2/jwks}, {@code /.well-known/openid-configuration},
+ * {@code /oauth2/token} (authorization code and refresh token grants), {@code /oauth2/revoke} (token revocation),
+ * {@code /connect/logout} (OIDC RP-initiated logout), {@code /oauth2/jwks}, {@code /.well-known/openid-configuration},
  * {@code /.well-known/oauth-authorization-server}, {@code /userinfo}, ...). A browser that isn't signed in is sent
- * to {@code /login}.</li>
+ * to {@code /login}. Once the authorization code is issued, the browser's session here ends
+ * ({@link SessionEndingAuthorizationResponseHandler}): the web app keeps its own session, and nothing can sign
+ * someone back in without their password after sign-out or refresh-token reuse.</li>
  * <li>{@link #loginSecurityFilterChain}: {@code GET /login} (page) and {@code POST /login} (form, CSRF protected).
  * Public.</li>
  * </ol>
- * Only Authorization Code + PKCE is possible: the registered clients allow no other grant (see
- * {@link RegisteredClients}).
+ * Only Authorization Code + PKCE (plus the refresh token grant it leads to) is possible: the registered clients
+ * allow no other grant (see {@link RegisteredClients}). Refresh tokens are rotated on every use, and presenting a
+ * replaced one ends the whole authorization ({@link RefreshTokenReuseDetectingAuthorizationService}). Signing out
+ * revokes the refresh token, which also invalidates its access token; the resource server refuses an access token
+ * that is no longer current at once ({@code com.washbase.api.config.SecurityConfig}).
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AuthProperties.class)
@@ -54,7 +62,12 @@ class AuthorizationServerConfig {
 	SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
 		http.oauth2AuthorizationServer(authorizationServer -> {
 			http.securityMatcher(authorizationServer.getEndpointsMatcher());
-			authorizationServer.oidc(Customizer.withDefaults());
+			authorizationServer
+				// Ends the API's own sign-in session as soon as the code is issued (CAR-18).
+				.authorizationEndpoint(endpoint -> endpoint
+					.authorizationResponseHandler(new SessionEndingAuthorizationResponseHandler()))
+				// Defaults include RP-initiated logout (/connect/logout) for any session still left.
+				.oidc(Customizer.withDefaults());
 		})
 			.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
 			// Browsers (HTML) that aren't signed in go to the sign-in page; other callers get 401.
@@ -92,11 +105,16 @@ class AuthorizationServerConfig {
 		return RegisteredClients.fromConfiguration(authProperties, passwordEncoder);
 	}
 
-	/** Authorizations (codes, tokens) in {@code oauth2_authorization}, Flyway {@code V2__oauth2_authorization.sql}. */
+	/**
+	 * Authorizations (codes, tokens) in {@code oauth2_authorization}, Flyway {@code V2__oauth2_authorization.sql},
+	 * with refresh-token reuse detection ({@code oauth2_replaced_refresh_token}, {@code V3__refresh_token_rotation.sql}).
+	 */
 	@Bean
 	OAuth2AuthorizationService authorizationService(JdbcOperations jdbcOperations,
-			RegisteredClientRepository registeredClientRepository) {
-		return new JdbcOAuth2AuthorizationService(jdbcOperations, registeredClientRepository);
+			RegisteredClientRepository registeredClientRepository, PlatformTransactionManager transactionManager) {
+		return new RefreshTokenReuseDetectingAuthorizationService(
+				new JdbcOAuth2AuthorizationService(jdbcOperations, registeredClientRepository), jdbcOperations,
+				new TransactionTemplate(transactionManager));
 	}
 
 	/** Unused while first-party clients skip consent; kept so the JDBC tables match Spring Authorization Server. */

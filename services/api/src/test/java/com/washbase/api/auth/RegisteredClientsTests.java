@@ -37,7 +37,8 @@ class RegisteredClientsTests {
 		assertThat(passwordEncoder.matches(SECRET, web.getClientSecret())).isTrue();
 		assertThat(web.getClientAuthenticationMethods())
 			.containsExactly(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
-		assertThat(web.getAuthorizationGrantTypes()).containsExactly(AuthorizationGrantType.AUTHORIZATION_CODE);
+		assertThat(web.getAuthorizationGrantTypes()).containsExactlyInAnyOrder(AuthorizationGrantType.AUTHORIZATION_CODE,
+				AuthorizationGrantType.REFRESH_TOKEN);
 		assertThat(web.getRedirectUris()).containsExactly("http://localhost:13000/auth/callback");
 		assertThat(web.getScopes()).containsExactly("openid");
 		assertThat(web.getClientSettings().isRequireProofKey()).isTrue();
@@ -47,6 +48,22 @@ class RegisteredClientsTests {
 		assertThat(web.getTokenSettings().getIdTokenSignatureAlgorithm()).isEqualTo(SignatureAlgorithm.RS256);
 		assertThat(output.getAll()).doesNotContain(RegisteredClients.WEB_CLIENT_MISSING_WARNING)
 			.doesNotContain(SECRET);
+	}
+
+	@Test
+	@DisplayName("washbase-web gets opaque refresh tokens, rotated on every use, with the configured lifetime, and signs out to the web app's home")
+	void webClientRefreshTokensAndSignOut() {
+		AuthProperties settings = new AuthProperties("http://localhost:8080", "washbase-api", null, true,
+				new AuthProperties.WebClient("washbase-web", SECRET, "http://localhost:13000/auth/callback"),
+				Duration.ofDays(7));
+
+		RegisteredClient web = RegisteredClients.fromConfiguration(settings, passwordEncoder)
+			.findByClientId("washbase-web");
+
+		assertThat(web.getAuthorizationGrantTypes()).contains(AuthorizationGrantType.REFRESH_TOKEN);
+		assertThat(web.getTokenSettings().isReuseRefreshTokens()).as("rotated on every use").isFalse();
+		assertThat(web.getTokenSettings().getRefreshTokenTimeToLive()).isEqualTo(Duration.ofDays(7));
+		assertThat(web.getPostLogoutRedirectUris()).containsExactly("http://localhost:13000/");
 	}
 
 	@Test
@@ -77,7 +94,8 @@ class RegisteredClientsTests {
 
 	private static AuthProperties settings(String secret) {
 		return new AuthProperties("http://localhost:8080", "washbase-api", null, true,
-				new AuthProperties.WebClient("washbase-web", secret, "http://localhost:13000/auth/callback"));
+				new AuthProperties.WebClient("washbase-web", secret, "http://localhost:13000/auth/callback"),
+				Duration.ofDays(30));
 	}
 
 }
