@@ -44,7 +44,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - name: Unit tests (web, Vitest)
+      - name: Unit tests (web Vitest, mobile Jest)
         run: pnpm test
 
   e2e:
