@@ -13,6 +13,7 @@
     "api:client": "node scripts/api.mjs run -- pnpm --filter @washbase/api-client sync",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
     "test:e2e": "pnpm --filter @washbase/web test:e2e",
     "try:open-prs": "node scripts/try-open-prs.mjs",
     "db:reset": "node scripts/db.mjs reset"

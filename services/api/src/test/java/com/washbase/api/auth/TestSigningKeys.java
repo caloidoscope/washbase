@@ -3,6 +3,7 @@ package com.washbase.api.auth;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.time.Duration;
 import java.util.Base64;
 
 /** Signing keys generated for one test run, as PKCS#8 PEM (what {@code WASHBASE_AUTH_SIGNING_KEY} holds). */
@@ -37,7 +38,8 @@ final class TestSigningKeys {
 
 	static AuthProperties properties(String signingKey, boolean allowGenerated) {
 		return new AuthProperties("http://localhost:8080", "washbase-api", signingKey, allowGenerated,
-				new AuthProperties.WebClient("washbase-web", null, "http://localhost:3000/auth/callback"));
+				new AuthProperties.WebClient("washbase-web", null, "http://localhost:3000/auth/callback"),
+				Duration.ofDays(30));
 	}
 
 }

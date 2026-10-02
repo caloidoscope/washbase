@@ -12,10 +12,14 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtAudienceValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -67,14 +71,24 @@ class SecurityConfig {
 
 	/**
 	 * Validates tokens in-process against the authorization server's own keys (no HTTP call to the JWKS
-	 * endpoint): signature, {@code exp}/{@code nbf}, {@code typ}, {@code iss} and {@code aud}.
+	 * endpoint): signature, {@code exp}/{@code nbf}, {@code typ}, {@code iss} and {@code aud}. Then, only if all of
+	 * those pass, that the token is still the current access token of a non-revoked authorization
+	 * ({@link CurrentAccessTokenValidator}, CAR-18): a token from before sign-out, a renewal or refresh-token reuse
+	 * gets {@code 401} at once instead of living out its 15 minutes.
 	 */
 	@Bean
-	JwtDecoder jwtDecoder(JWKSource<SecurityContext> jwkSource, AuthProperties authProperties) {
+	JwtDecoder jwtDecoder(JWKSource<SecurityContext> jwkSource, AuthProperties authProperties,
+			OAuth2AuthorizationService authorizationService) {
 		NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSource(jwkSource).build();
-		decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+		OAuth2TokenValidator<Jwt> claims = new DelegatingOAuth2TokenValidator<>(
 				JwtValidators.createDefaultWithIssuer(authProperties.issuer()),
-				new JwtAudienceValidator(authProperties.audience())));
+				new JwtAudienceValidator(authProperties.audience()));
+		OAuth2TokenValidator<Jwt> current = new CurrentAccessTokenValidator(authorizationService);
+		// Sequential, not DelegatingOAuth2TokenValidator: no database lookup for a token whose claims already fail.
+		decoder.setJwtValidator(jwt -> {
+			OAuth2TokenValidatorResult result = claims.validate(jwt);
+			return result.hasErrors() ? result : current.validate(jwt);
+		});
 		return decoder;
 	}
 

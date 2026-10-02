@@ -1,7 +1,10 @@
 package com.washbase.api.auth;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.util.StringUtils;
@@ -21,12 +24,23 @@ import org.springframework.validation.annotation.Validated;
  * fast. {@code true} only for local runs, tests and CI ({@code scripts/api.mjs}, profile {@code local}, test
  * config). Env: {@code WASHBASE_AUTH_ALLOW_GENERATED_SIGNING_KEY}.
  * @param webClient the web app's registered client ({@code washbase-web}).
+ * @param refreshTokenTtl how long a refresh token lives (ISO-8601, e.g. {@code P30D}, the default). Refresh tokens
+ * are rotated on every use and each new one gets the full lifetime, so a sign-in lasts until sign-out or this long
+ * without use (CAR-18). Must be longer than the access token's 15 minutes. Env:
+ * {@code WASHBASE_AUTH_REFRESH_TOKEN_TTL}.
  */
 @Validated
 @ConfigurationProperties("washbase.auth")
 public record AuthProperties(@NotBlank @DefaultValue("http://localhost:8080") String issuer,
 		@NotBlank @DefaultValue("washbase-api") String audience, String signingKey,
-		@DefaultValue("false") boolean allowGeneratedSigningKey, @Valid @DefaultValue WebClient webClient) {
+		@DefaultValue("false") boolean allowGeneratedSigningKey, @Valid @DefaultValue WebClient webClient,
+		@NotNull @DefaultValue("P30D") Duration refreshTokenTtl) {
+
+	/** @return whether {@link #refreshTokenTtl} outlives an access token (anything shorter would end every session) */
+	@AssertTrue(message = "washbase.auth.refresh-token-ttl must be longer than the access token lifetime (15 minutes)")
+	boolean isRefreshTokenTtlLongerThanAccessToken() {
+		return refreshTokenTtl == null || refreshTokenTtl.compareTo(RegisteredClients.ACCESS_TOKEN_TIME_TO_LIVE) > 0;
+	}
 
 	/** @return whether a signing key is configured */
 	public boolean hasSigningKey() {
@@ -38,7 +52,7 @@ public record AuthProperties(@NotBlank @DefaultValue("http://localhost:8080") St
 	public String toString() {
 		return "AuthProperties[issuer=" + issuer + ", audience=" + audience + ", signingKey="
 				+ (hasSigningKey() ? "******" : "<unset>") + ", allowGeneratedSigningKey=" + allowGeneratedSigningKey
-				+ ", webClient=" + webClient + "]";
+				+ ", webClient=" + webClient + ", refreshTokenTtl=" + refreshTokenTtl + "]";
 	}
 
 	/**
