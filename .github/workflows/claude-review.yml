@@ -25,6 +25,10 @@ jobs:
         with:
           # Full history so the reviewer can diff the PR against its base.
           fetch-depth: 0
+      # The repo's .mcp.json is for local development (Postgres, GitHub and Linear MCP servers with
+      # local URLs and secrets). In CI those servers can't start, and the reviewer then fails to post.
+      - name: Drop local MCP config
+        run: rm -f .mcp.json
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -38,7 +42,8 @@ jobs:
             If the PR links a Linear issue, check the change against its acceptance criteria as
             described in the PR body. Skip style nits that lint already covers.
             Leave inline comments for specific issues and one short summary comment ending in
-            APPROVED or CHANGES REQUESTED.
+            APPROVED or CHANGES REQUESTED. Always post the summary with `gh pr comment`, even if
+            other tools are unavailable; a verdict that only appears in the job log is lost.
           # Show the reviewer's full output in the job log, so denied tools and errors are visible.
           show_full_output: true
           # Read-only access to the checkout (files, diffs, history) plus the PR comment tools.
